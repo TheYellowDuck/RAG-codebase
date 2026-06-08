@@ -1,19 +1,31 @@
 """The code graph — connections between files, symbols, and calls.
 
 Why this exists: so the model doesn't have to scan the whole codebase. Retrieval
-finds the *entry point* chunk; the graph then tells us exactly which other chunks
-are connected (callees, callers, imports, the enclosing class) so we can hand the
-model a few precise neighbors plus a compact structural map — instead of dumping
-entire files and burning tokens.
+finds the *entry point* chunk; the graph then says which other chunks connect to it
+(callees, callers, imports, the enclosing class) so we can hand the model a few
+precise neighbors plus a compact structural map instead of dumping whole files.
 
 Nodes are keyed by chunk id (so a graph node *is* a retrievable/citable chunk).
-Edges are resolved heuristically by name, which is cheap and good enough to be a
-real token-saver without a full type-resolver.
 
-Edge types (stored on the *source* node, with reverse links maintained too):
+Edge types (stored on the *source* node; reverse links maintained for traversal):
   contains   class  -> its methods
   calls      symbol -> the symbol it calls
   imports    module -> a symbol/module it imports
+
+Resolution is heuristic but high-precision (no full type inference). An edge is
+added only when the target resolves confidently, in this priority order:
+  1. a unique definition of the name;
+  2. else a definition in the caller's OWN file (language scoping);
+  3. else a definition in a file the caller IMPORTS the name from (import-aware);
+  4. else nothing — ambiguous names are left unlinked rather than guessed.
+
+Beyond lookup the graph supports BFS context expansion (`neighbors`), Aider-style
+context selection (`personalized_pagerank`), editing (`add_edge`/`remove_edge`/
+`find_ids`), and rendering (graph/viz.py — DOT / Mermaid / interactive HTML).
+
+Empirical note: the graph's *retrieval* value is conditional — significant on a
+typed-language repo with a dense call graph (Go), null on Python where strong
+retrieval already finds the files (RESULTS.md §3a). Expansion is opt-in.
 """
 from __future__ import annotations
 
@@ -95,14 +107,12 @@ class CodeGraph:
                 if len(parent_ids) == 1 and parent_ids[0] != cid:
                     g._add_edge(parent_ids[0], cid, EDGE_CONTAINS)
 
-        # Pass 3: calls — resolve callee name to a defined symbol.
-        for fp in file_parses:
-            for caller_id, callee in fp.calls:
-                target = cls._resolve(callee, by_qualified, by_simple)
-                if target and target != caller_id:
-                    g._add_edge(caller_id, target, EDGE_CALLS)
+        node_file = {cid: n.file_path for cid, n in g.nodes.items()}
 
-        # Pass 4: imports — link a module to symbols/files it imports.
+        # Pass 3: imports FIRST — link module -> imported symbol/file, and record a
+        # per-file import map (file -> imported simple_name -> source file[s]) so the
+        # call pass can resolve ambiguous names the way the language actually does.
+        import_map: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
         for fp in file_parses:
             for module_id, name in fp.imports:
                 target = cls._resolve(name, by_qualified, by_simple)
@@ -115,27 +125,112 @@ class CodeGraph:
                             break
                 if target and target != module_id:
                     g._add_edge(module_id, target, EDGE_IMPORTS)
+                    tnode = g.nodes.get(target)
+                    if tnode and node_file.get(module_id):
+                        import_map[node_file[module_id]][tnode.simple_name].add(tnode.file_path)
+
+        # Pass 4: calls — resolve the callee. Disambiguation, high-precision first:
+        # (1) caller's own file, (2) a file the caller IMPORTS the name from, else skip.
+        for fp in file_parses:
+            for caller_id, callee in fp.calls:
+                caller_file = node_file.get(caller_id)
+                simple = callee.rsplit(".", 1)[-1]
+                import_files = import_map.get(caller_file, {}).get(simple)
+                target = cls._resolve(callee, by_qualified, by_simple,
+                                      prefer_file=caller_file, node_file=node_file,
+                                      import_files=import_files)
+                if target and target != caller_id:
+                    g._add_edge(caller_id, target, EDGE_CALLS)
 
         return g
 
     @staticmethod
-    def _resolve(name: str, by_qualified: dict, by_simple: dict) -> Optional[str]:
+    def _resolve(name: str, by_qualified: dict, by_simple: dict,
+                 prefer_file: Optional[str] = None,
+                 node_file: Optional[dict] = None,
+                 import_files: Optional[set] = None) -> Optional[str]:
+        def disambiguate(cands: list[str]) -> Optional[str]:
+            if prefer_file and node_file:               # (1) caller's own file wins
+                same = [c for c in cands if node_file.get(c) == prefer_file]
+                if len(same) == 1:
+                    return same[0]
+            if import_files and node_file:              # (2) a file the caller imports from
+                imp = [c for c in cands if node_file.get(c) in import_files]
+                if len(imp) == 1:
+                    return imp[0]
+            return None                                 # still ambiguous -> don't guess
+
         exact = by_qualified.get(name, [])
         if len(exact) == 1:
             return exact[0]
         if len(exact) > 1:
-            return None  # qualified name collides across files — don't guess
-        simple = name.rsplit(".", 1)[-1]
-        candidates = by_simple.get(simple, [])
+            return disambiguate(exact)  # qualified collision — same-file/import or skip
+        candidates = by_simple.get(name.rsplit(".", 1)[-1], [])
         if len(candidates) == 1:
             return candidates[0]
-        # Ambiguous (or unknown) name — don't guess; an over-linked graph adds noise.
-        return None
+        if len(candidates) > 1:
+            return disambiguate(candidates)
+        return None  # unknown name — don't guess; an over-linked graph adds noise
+
+    # ------------------------------------------------------------------ #
+    def personalized_pagerank(self, seeds: Iterable[str], alpha: float = 0.85,
+                              iters: int = 30) -> dict[str, float]:
+        """Personalized PageRank over the (undirected) graph, restarting at `seeds`.
+
+        Nodes well-connected to the retrieved seeds score high — the Aider-style use
+        of the graph: rank the connected subgraph to *select* context, rather than
+        blindly expanding 1-hop neighbors. Pure power iteration (no extra deps)."""
+        if not self.nodes:
+            return {}
+        adj: dict[str, set] = defaultdict(set)
+        for src, edges in self.out_edges.items():
+            for dst, _ in edges:
+                if src in self.nodes and dst in self.nodes:
+                    adj[src].add(dst)
+                    adj[dst].add(src)
+        seeds = [s for s in seeds if s in self.nodes]
+        if not seeds:
+            return {}
+        tele = 1.0 / len(seeds)
+        score = {nid: 0.0 for nid in self.nodes}
+        for s in seeds:
+            score[s] = tele
+        for _ in range(iters):
+            new = {nid: 0.0 for nid in self.nodes}
+            for nid, sc in score.items():
+                nbrs = adj.get(nid)
+                if nbrs:
+                    share = alpha * sc / len(nbrs)
+                    for m in nbrs:
+                        new[m] += share
+            for s in seeds:
+                new[s] += (1 - alpha) * tele
+            score = new
+        return score
 
     def _add_edge(self, src: str, dst: str, edge_type: str) -> None:
         if (dst, edge_type) not in self.out_edges[src]:
             self.out_edges[src].append((dst, edge_type))
             self.in_edges[dst].append((src, edge_type))
+
+    # Public edit API (used by the graph editor / `graph-edit` CLI).
+    def add_edge(self, src: str, dst: str, edge_type: str = EDGE_CALLS) -> None:
+        if src in self.nodes and dst in self.nodes:
+            self._add_edge(src, dst, edge_type)
+
+    def remove_edge(self, src: str, dst: str, edge_type: Optional[str] = None) -> int:
+        """Remove edge(s) src→dst (optionally of a given type). Returns count removed."""
+        before = len(self.out_edges.get(src, []))
+        self.out_edges[src] = [(d, t) for d, t in self.out_edges.get(src, [])
+                               if not (d == dst and (edge_type is None or t == edge_type))]
+        self.in_edges[dst] = [(s, t) for s, t in self.in_edges.get(dst, [])
+                              if not (s == src and (edge_type is None or t == edge_type))]
+        return before - len(self.out_edges[src])
+
+    def find_ids(self, name: str) -> list[str]:
+        """Chunk ids whose qualified or simple name matches `name`."""
+        return [cid for cid, n in self.nodes.items()
+                if n.qualified_name == name or n.simple_name == name]
 
     # ------------------------------------------------------------------ #
     # Queries
