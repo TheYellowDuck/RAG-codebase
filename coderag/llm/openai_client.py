@@ -27,11 +27,8 @@ class OpenAIClient(LLMClient):
                 "Set OPENAI_API_KEY (for local OpenAI-compatible servers any value "
                 "works), and optionally CODERAG_LLM_BASE_URL for a custom endpoint."
             )
-        try:
-            import openai
-        except ImportError as e:  # pragma: no cover - dependency guard
-            raise RuntimeError("The 'openai' package is not installed. Run: "
-                               "pip install 'coderag[openai]'  (or: pip install openai)") from e
+        from .deps import ensure_sdk
+        openai = ensure_sdk("openai", "openai")
         kwargs = {}
         if config.base_url:
             kwargs["base_url"] = config.base_url

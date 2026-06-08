@@ -25,8 +25,9 @@ __all__ = ["LLMClient", "Completion", "extract_json", "LLMConfig", "get_llm_clie
 
 
 def get_llm_client(config: Optional[LLMConfig] = None) -> LLMClient:
-    """Return an LLM client for the configured provider (raises with guidance if
-    the provider's key/SDK is missing)."""
+    """Return an LLM client for the configured provider. Auto-installs that
+    provider's SDK if it's missing (set CODERAG_NO_AUTO_INSTALL=1 to opt out);
+    raises with guidance if the provider's key is missing."""
     config = config or LLMConfig.from_env()
     if config.provider == "anthropic":
         from .anthropic_client import AnthropicClient
