@@ -125,6 +125,7 @@ def run_config(retriever: Retriever, settings: Settings,
             row["answer"] = ans.answer
             row["faithfulness"] = faith["faithfulness"]
             row["n_unsupported"] = len(faith.get("unsupported", []))
+            row["context_tokens"] = ans.context_tokens
             cited = parse_citations(ans.answer)
             cit = citation_precision_recall(ans.sources, cited, q.relevant_files)
             row["citation_precision"] = cit["citation_precision"]
@@ -146,9 +147,11 @@ def _aggregate(per_q: list[dict], eval_k: int, generate: bool) -> dict:
 
     agg = {
         "n": len(per_q),
+        # Bootstrap CIs on the metrics interviewers scrutinize, so saturation /
+        # noise is visible rather than hidden behind point estimates.
         f"recall@{eval_k}": bootstrap_ci(col("recall@k")),
-        "mrr": {"mean": _mean(col("mrr"))},
-        f"ndcg@{eval_k}": {"mean": _mean(col("ndcg@k"))},
+        "mrr": bootstrap_ci(col("mrr")),
+        f"ndcg@{eval_k}": bootstrap_ci(col("ndcg@k")),
         f"precision@{eval_k}": {"mean": _mean(col("precision@k"))},
     }
     if any("sym_recall@k" in r for r in per_q):
@@ -158,8 +161,10 @@ def _aggregate(per_q: list[dict], eval_k: int, generate: bool) -> dict:
         agg["faithfulness"] = bootstrap_ci(col("faithfulness"))
         agg["citation_precision"] = {"mean": _mean(col("citation_precision"))}
         agg["citation_recall"] = {"mean": _mean(col("citation_recall"))}
+        if col("context_tokens"):
+            agg["context_tokens"] = {"mean": round(_mean(col("context_tokens")))}
         if col("correctness"):
-            agg["correctness"] = {"mean": _mean(col("correctness"))}
+            agg["correctness"] = bootstrap_ci(col("correctness"))
     return agg
 
 
@@ -172,13 +177,15 @@ def format_table(run_results: list[dict], eval_k: int, generate: bool) -> str:
         headers += ["Faithfulness", "Cite-P", "Cite-R", "Correct"]
     rows = ["| " + " | ".join(headers) + " |",
             "|" + "|".join(["---"] * len(headers)) + "|"]
+    if generate:
+        headers += ["CtxTok"]
     for rr in run_results:
         a = rr["aggregate"]
         cells = [
             rr["config"],
             _fmt_ci(a[f"recall@{eval_k}"]),
-            f"{a['mrr']['mean']:.3f}",
-            f"{a[f'ndcg@{eval_k}']['mean']:.3f}",
+            _fmt_ci(a["mrr"]),
+            _fmt_ci(a[f"ndcg@{eval_k}"]),
             f"{a[f'precision@{eval_k}']['mean']:.3f}",
         ]
         if has_sym:
@@ -191,8 +198,8 @@ def format_table(run_results: list[dict], eval_k: int, generate: bool) -> str:
                 _fmt_ci(a.get("faithfulness", {})),
                 f"{a.get('citation_precision', {}).get('mean', 0):.3f}",
                 f"{a.get('citation_recall', {}).get('mean', 0):.3f}",
-                f"{a.get('correctness', {}).get('mean', float('nan')):.3f}"
-                if "correctness" in a else "n/a",
+                _fmt_ci(a["correctness"]) if "correctness" in a else "n/a",
+                f"{a.get('context_tokens', {}).get('mean', 0)}",
             ]
         rows.append("| " + " | ".join(cells) + " |")
     return "\n".join(rows)

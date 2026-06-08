@@ -48,9 +48,11 @@ def recall_at_k(retrieved: list, relevant: Iterable[str], k: int) -> float:
 
 
 def precision_at_k(retrieved: list, relevant: Iterable[str], k: int) -> float:
+    # Standard precision@k: divide by k (not len(top)). Dividing by the number of
+    # distinct files surfaced would let P@k exceed its own label ceiling when fewer
+    # than k distinct files are retrieved.
     relevant = set(relevant)
-    top = retrieved[:k]
-    return sum(c in relevant for c in top) / len(top) if top else 0.0
+    return sum(c in relevant for c in retrieved[:k]) / k if k else 0.0
 
 
 def reciprocal_rank(retrieved: list, relevant: Iterable[str]) -> float:
