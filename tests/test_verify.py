@@ -52,3 +52,38 @@ def test_verify_answer_survives_judge_failure():
     assert report["structural"]["invalid_citations"] == [2]
     assert "faithfulness" not in report
     assert "faithfulness_error" in report
+
+
+def test_faithfulness_excludes_abstention_claims():
+    """An honest 'the sources don't cover X' line must not count against
+    faithfulness — otherwise we'd penalize the abstaining behavior we want."""
+    from coderag.config import Settings
+    from coderag.generate import Source
+    from coderag.verify import faithfulness_score
+    from coderag.verify.faithfulness import is_abstention
+
+    assert is_abstention("The sources do not contain the low-level mechanism.")
+    assert not is_abstention("include_router registers routes via the router.")
+
+    class FakeJudge:
+        provider, gen_model, judge_model = "fake", "g", "j"
+        def __init__(self):
+            self.q = [
+                {"claims": [
+                    {"text": "include_router registers routes", "sources": [1],
+                     "supported": True, "reason": "ok"},
+                    {"text": "The sources do not contain the low-level mechanism",
+                     "sources": [], "supported": False, "reason": "abstain"},
+                ]},
+            ]
+        def judge_json(self, prompt, schema, *, max_tokens=2048):
+            return self.q.pop(0)
+
+    sources = [Source(n=1, chunk_id="c", file_path="a.py", start_line=1, end_line=2,
+                      code="def include_router(): ...")]
+    out = faithfulness_score(
+        "include_router registers routes [1]. The sources do not contain the low-level mechanism.",
+        sources, Settings(), client=FakeJudge())
+    assert out["n_claims"] == 1          # abstention claim dropped
+    assert out["n_supported"] == 1
+    assert out["faithfulness"] == 1.0

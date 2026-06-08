@@ -12,6 +12,12 @@ def test_rrf_rewards_agreement():
     assert fused.index("b") < fused.index("c")
 
 
+def test_rrf_weights_tilt_fusion():
+    # same rank in each list -> equal by default; weighting a list lifts its item.
+    assert rrf(["y"], ["z"], weights=[10.0, 1.0])[0] == "y"
+    assert rrf(["y"], ["z"], weights=[1.0, 10.0])[0] == "z"
+
+
 def test_rrf_single_list_preserves_order():
     assert rrf(["x", "y", "z"]) == ["x", "y", "z"]
 

@@ -60,6 +60,16 @@ def test_unknown_provider_raises():
         get_llm_client(LLMConfig(provider="bogus"))
 
 
+def test_adaptive_thinking_only_for_supported_models():
+    # Sending adaptive thinking to Haiku 4.5 / Sonnet 4.5 / older returns a 400,
+    # so the Anthropic adapter must gate it by model.
+    from coderag.llm.anthropic_client import _supports_adaptive_thinking
+    assert _supports_adaptive_thinking("claude-opus-4-8")
+    assert _supports_adaptive_thinking("claude-sonnet-4-6")
+    assert not _supports_adaptive_thinking("claude-haiku-4-5")
+    assert not _supports_adaptive_thinking("claude-sonnet-4-5")
+
+
 # --- generation + faithfulness through an injected fake client --------------
 class FakeLLM(LLMClient):
     """Stub LLMClient — no SDK, no network. Returns canned text/JSON."""
@@ -101,12 +111,12 @@ def test_faithfulness_through_fake_client():
 
     sources = [Source(n=1, chunk_id="c1", file_path="a.py", start_line=1, end_line=3,
                       code="def f(): return 422")]
-    # 1st judge call = claim extraction; 2nd = verification.
+    # Single-call judge: one payload with claims + verdicts.
     fake = FakeLLM(json_queue=[
-        {"claims": [{"text": "f returns 422", "sources": [1]},
-                    {"text": "g returns 200", "sources": [2]}]},
-        {"results": [{"index": 0, "verdict": "SUPPORTED", "reason": "ok"},
-                     {"index": 1, "verdict": "UNSUPPORTED", "reason": "no source 2"}]},
+        {"claims": [
+            {"text": "f returns 422", "sources": [1], "supported": True, "reason": "ok"},
+            {"text": "g returns 200", "sources": [2], "supported": False, "reason": "no src 2"},
+        ]},
     ])
     out = faithfulness_score("f returns 422 [1]. g returns 200 [2].", sources,
                              Settings(), client=fake)

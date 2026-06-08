@@ -4,7 +4,7 @@ from coderag.eval.metrics import (
     recall_at_k, precision_at_k, reciprocal_rank, ndcg_at_k, retrieved_files,
     retrieved_symbols, recall_at_k_symbol, reciprocal_rank_symbol, symbol_match,
 )
-from coderag.eval.bootstrap import bootstrap_ci
+from coderag.eval.bootstrap import bootstrap_ci, paired_bootstrap
 
 
 def test_recall_precision():
@@ -13,6 +13,8 @@ def test_recall_precision():
     assert recall_at_k(retrieved, relevant, 2) == 0.5     # only b in top-2
     assert recall_at_k(retrieved, relevant, 4) == 1.0
     assert precision_at_k(retrieved, relevant, 2) == 0.5  # 1 of 2 relevant
+    # precision divides by k, not len(top): one relevant file, k=5 -> 1/5 (never >1)
+    assert precision_at_k(["b.py"], relevant, 5) == 0.2
     assert recall_at_k([], relevant, 5) == 0.0
     assert recall_at_k(retrieved, set(), 5) == 0.0        # no relevant -> 0
 
@@ -60,6 +62,15 @@ def test_retrieved_symbols_strips_window_suffix():
             self.symbol_name = s
     out = retrieved_symbols([R("foo#1"), R("foo#2"), R("bar")])
     assert out == ["foo", "bar"]
+
+
+def test_paired_bootstrap():
+    # a strictly beats b on every question -> significant, diff CI excludes 0
+    r = paired_bootstrap([1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0])
+    assert r["mean_diff"] == 1.0 and r["lo"] > 0 and r["significant"]
+    # identical -> no difference, not significant
+    r2 = paired_bootstrap([1, 0, 1, 0, 1], [1, 0, 1, 0, 1])
+    assert r2["mean_diff"] == 0.0 and not r2["significant"]
 
 
 def test_bootstrap_ci_bounds():

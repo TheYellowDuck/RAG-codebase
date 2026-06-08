@@ -84,16 +84,57 @@ def test_save_load_roundtrip(make_fileinfo, tmp_path):
     assert g2.stats()["edges"] == g.stats()["edges"]
 
 
-def test_ambiguous_name_not_linked(make_fileinfo):
-    # Two distinct symbols share a simple name -> resolver must not guess.
-    src = (
-        "def foo():\n    return shared()\n\n"
-        "def shared():\n    return 1\n"
-    )
+def test_same_file_call_resolves(make_fileinfo):
+    # 'shared' is defined in both files; the caller's OWN-file definition should win
+    # (Python scoping) — richer edge-recall without guessing across files.
+    src = "def foo():\n    return shared()\n\ndef shared():\n    return 1\n"
     src2 = "def shared():\n    return 2\n"
     pa = chunk_file(make_fileinfo("x.py", src), "repo", "sha")
     pb = chunk_file(make_fileinfo("y.py", src2), "repo", "sha")
     g = CodeGraph.build([pa, pb])
     foo = next(s.chunk_id for s in pa.symbols if s.qualified_name == "foo")
-    # 'shared' is ambiguous across files -> no calls edge created
-    assert all(n.relation != "calls" for n in g.neighbors(foo))
+    calls = [n for n in g.neighbors(foo) if n.relation == "calls"]
+    assert any(n.node.file_path == "x.py" and n.node.simple_name == "shared"
+               for n in calls)
+
+
+def test_resolve_import_disambiguation():
+    # 'helper' is ambiguous (defined in x.py and y.py). The resolver should:
+    #  (1) prefer the caller's own file, (2) else the file the caller imports it from,
+    #  (3) else refuse to guess.
+    from coderag.graph.code_graph import CodeGraph
+    by_q, by_s = {}, {"helper": ["cidX", "cidY"]}
+    nf = {"cidX": "x.py", "cidY": "y.py"}
+    # caller in z.py imports helper from y.py -> resolve to y.py's helper
+    assert CodeGraph._resolve("helper", by_q, by_s, prefer_file="z.py",
+                              node_file=nf, import_files={"y.py"}) == "cidY"
+    # caller is x.py itself -> own-file wins over the import hint
+    assert CodeGraph._resolve("helper", by_q, by_s, prefer_file="x.py",
+                              node_file=nf, import_files={"y.py"}) == "cidX"
+    # ambiguous, no own-file match, no import info -> don't guess
+    assert CodeGraph._resolve("helper", by_q, by_s, prefer_file="z.py", node_file=nf) is None
+
+
+def test_personalized_pagerank_favors_connected(make_fileinfo):
+    # foo->shared connected; lonely is isolated. PPR seeded at foo must rank the
+    # connected `shared` above the disconnected `lonely`.
+    pa = chunk_file(make_fileinfo("x.py", "def foo():\n    return shared()\n\n"
+                                  "def shared():\n    return 1\n"), "r", "s")
+    pb = chunk_file(make_fileinfo("y.py", "def lonely():\n    return 0\n"), "r", "s")
+    g = CodeGraph.build([pa, pb])
+    foo = next(s.chunk_id for s in pa.symbols if s.qualified_name == "foo")
+    shared = next(s.chunk_id for s in pa.symbols if s.simple_name == "shared")
+    lonely = next(s.chunk_id for s in pb.symbols if s.simple_name == "lonely")
+    ppr = g.personalized_pagerank([foo])
+    assert ppr[shared] > ppr.get(lonely, 0.0)
+
+
+def test_cross_file_ambiguous_not_linked(make_fileinfo):
+    # Caller has NO local definition and the name is ambiguous across two other
+    # files -> resolver must not guess.
+    pz = chunk_file(make_fileinfo("z.py", "def bar():\n    return shared()\n"), "repo", "sha")
+    px = chunk_file(make_fileinfo("x.py", "def shared():\n    return 1\n"), "repo", "sha")
+    py = chunk_file(make_fileinfo("y.py", "def shared():\n    return 2\n"), "repo", "sha")
+    g = CodeGraph.build([pz, px, py])
+    bar = next(s.chunk_id for s in pz.symbols if s.qualified_name == "bar")
+    assert all(n.relation != "calls" for n in g.neighbors(bar))
