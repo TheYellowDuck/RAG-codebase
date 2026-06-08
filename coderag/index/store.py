@@ -47,7 +47,8 @@ class CodeIndex:
     # ------------------------------------------------------------------ #
     @classmethod
     def build(cls, repo_path: str, settings: Settings,
-              embedder: Optional[Embedder] = None, progress: bool = True) -> "CodeIndex":
+              embedder: Optional[Embedder] = None, progress: bool = True,
+              install_grammars: bool = False) -> "CodeIndex":
         idx = cls(settings, embedder)
         idx.repo_path = os.path.abspath(repo_path)
         idx.repo = os.path.basename(idx.repo_path.rstrip("/")) or "repo"
@@ -56,6 +57,14 @@ class CodeIndex:
         files = discover_files(idx.repo_path)
         if progress:
             print(f"Discovered {len(files)} candidate files in {idx.repo}")
+
+        # Make grammars available for the languages actually present (so AST +
+        # graph cover all of them); installs on demand only when asked.
+        if not settings.window_chunk:
+            from ..ingest.grammars import ensure_grammars, auto_install_enabled
+            ensure_grammars({fi.language for fi in files},
+                            auto_install=auto_install_enabled(install_grammars),
+                            progress=progress)
 
         parses: list[FileParse] = []
         for fi in files:
@@ -139,7 +148,16 @@ class CodeIndex:
             new_chunks.extend(parse.chunks)
         self._embed_and_index(new_chunks)
         # Cross-file edges depend on the full name index, so rebuild from records.
+        self.rebuild_graph()
+
+    def rebuild_graph(self) -> dict:
+        """Remake the code graph from the stored per-file parse records
+        (symbols/calls/imports) — NO re-chunking or re-embedding. Use this to apply
+        graph/resolver changes (e.g. import-aware resolution) to an existing index,
+        or to regenerate the graph after manual edits got messy. Does NOT pick up
+        source changes on disk — use `update`/`index` for that. Returns graph stats."""
         self.graph = CodeGraph.build(self._all_parses())
+        return self.graph.stats()
 
     def _all_parses(self) -> list[FileParse]:
         parses: list[FileParse] = []
