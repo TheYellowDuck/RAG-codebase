@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coderag"
+version = "0.1.0"
+description = "Code-aware retrieval-augmented generation over a repository, with a code graph and an evaluation harness."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40.0",
+    "sentence-transformers>=2.7.0",
+    "tree-sitter>=0.21.0",
+    "tree-sitter-python>=0.21.0",
+    "rank-bm25>=0.2.2",
+    "pathspec>=0.12.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+# Unlocks AST chunking for ~all languages (~165 tree-sitter grammars in one
+# install). Python works without it; JS/TS work with it OR with their own
+# dedicated grammar packages. Without it, unlisted languages window-chunk.
+langs = [
+    "tree-sitter-language-pack>=0.7.0",
+]
+# Use OpenAI or any OpenAI-compatible endpoint (OpenRouter, Together, Groq,
+# Ollama, LM Studio, vLLM, Azure) as the generation/judging provider.
+openai = [
+    "openai>=1.0",
+]
+# Expose the RAG as an MCP server (coderag.mcp_server) for agents/IDEs.
+mcp = [
+    "mcp>=1.2",
+]
+# External benchmark: stream CodeSearchNet for the retrieval validity check.
+bench = [
+    "datasets>=2.0",
+]
+dev = [
+    "pytest>=7.0",
+    "tree-sitter-language-pack>=0.7.0",
+]
+
+[project.scripts]
+coderag = "coderag.cli:main"
+coderag-mcp = "coderag.mcp_server:main"
+
+[tool.setuptools.packages.find]
+include = ["coderag*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

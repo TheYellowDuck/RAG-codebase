@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # Tests use a stub embedder and an injected fake LLM — no torch, no API key.
+      # Install the package without its heavy deps, then just the light test deps.
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . --no-deps
+          pip install numpy tree-sitter tree-sitter-python rank-bm25 pathspec pytest tree-sitter-language-pack
+      - name: Run tests
+        run: pytest -q

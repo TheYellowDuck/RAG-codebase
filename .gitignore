@@ -1,0 +1,43 @@
+# --- Secrets (never commit) ---
+# Any dotenv variant, any name — for any provider's key.
+.env
+.env.*
+*.env
+!.env.example
+.envrc
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# --- Project artifacts (large / regenerable) ---
+.coderag_index*/
+eval_runs/
+
+# --- Cloned target repos (don't vendor someone else's code) ---
+/fastapi/
+
+# --- OS ---
+.DS_Store
+
+# second-repo generalization scratch (cobra/Go)
+/cobra/
+.idx_cobra/
+
+# large-repo scaling test scratch (django)
+/django/
+.idx_django/
+
+# --- Generated viz / downloaded benchmark data (regenerable) ---
+graph.html
+coderag_graph.*
+data/humaneval_bench.jsonl

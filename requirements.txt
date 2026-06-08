@@ -1,0 +1,28 @@
+# Generation (Claude)
+anthropic>=0.40.0
+
+# Local embeddings + cross-encoder reranking (the default stack).
+# Pulls in torch + transformers on first install.
+sentence-transformers>=2.7.0
+
+# Code-aware chunking
+tree-sitter>=0.21.0
+tree-sitter-python>=0.21.0
+
+# Lexical retrieval
+rank-bm25>=0.2.2
+
+# .gitignore-aware file discovery
+pathspec>=0.12.0
+
+# Numerics (also a transitive dep of sentence-transformers)
+numpy>=1.24.0
+
+# --- Optional ---------------------------------------------------------------
+# AST-chunk ~all languages (~165 tree-sitter grammars in one install). Python is
+# AST-chunked without it; other languages fall back to line-window chunking until
+# it's installed. Enable with:  pip install 'coderag[langs]'  (or uncomment):
+# tree-sitter-language-pack>=0.7.0
+#
+# Test suite:  pip install 'coderag[dev]'  (or:  pip install pytest)
+# pytest>=7.0
