@@ -35,9 +35,9 @@ SKIP_FILES = {
 }
 
 # Language detection by extension lives in languages.EXT_TO_LANG (comprehensive,
-# tree-sitter-language-pack-compatible names). Python/JS/TS get precise AST specs;
-# every other recognized language gets the generic AST path; the rest fall back to
-# line-window chunking.
+# tree-sitter-language-pack-compatible names). 18 mainstream languages get precise
+# AST specs; every other recognized language gets the generic AST path; the rest
+# fall back to line-window chunking.
 
 DEFAULT_MAX_BYTES = 1_000_000   # 1 MB single-file cap (usually generated)
 DEFAULT_MAX_LINES = 5_000       # >5k lines is usually generated

@@ -9,7 +9,9 @@ chunk captures imports + top-level code. Files we can't parse (no grammar, or a
 syntax error) fall back to line-window chunking so nothing is silently dropped.
 
 Two classification modes (see languages.py):
-  - PRECISE  (Python/JS/TS): exact node types, best quality.
+  - PRECISE  (18 mainstream languages — Python, JS, TS, Go, Rust, Ruby, Java, C,
+    C++, C#, PHP, Kotlin, Scala, Swift, Lua, Bash, Perl, Objective-C): exact
+    node-type sets, best quality.
   - GENERIC  (any other grammar): nodes are classified by type-name *patterns*
     (`*function*`, `*class*/struct/impl/trait/...`, `*call*`, `*import*`), so any
     tree-sitter language yields symbol-level chunks + a code graph with no

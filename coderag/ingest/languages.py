@@ -345,3 +345,9 @@ def get_parser(language: str):
     parser = _load_dedicated(language) or _load_pack(language) or _load_module(language)
     _PARSERS[language] = parser
     return parser
+
+
+def reset_parser_cache() -> None:
+    """Forget cached parsers (incl. cached failures) so get_parser retries — call
+    after installing a grammar at runtime."""
+    _PARSERS.clear()
