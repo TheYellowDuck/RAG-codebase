@@ -57,12 +57,57 @@ class Settings:
     use_bm25: bool = True
     use_rerank: bool = True
     expand_graph: bool = False        # pull code-graph neighbors into context
-    graph_expand_budget: int = 4      # max neighbor chunks to add when expanding
+    graph_expand_budget: int = 4      # legacy: max neighbors appended post-rerank
+    # Graph fix: feed neighbors into the rerank POOL (so they must earn relevance)
+    # instead of appending them post-rerank with a fake score. This makes the graph
+    # a recall booster (surface a connected file retrieval missed) without injecting
+    # distractors. Set graph_expand_prererank=False for the legacy append behavior.
+    graph_expand_prererank: bool = True
+    graph_expand_seed: int = 5        # expand neighbors of the top-N fused candidates
+    graph_expand_depth: int = 1       # hops to traverse from each seed (>1 = multi-hop)
+    graph_pool_budget: int = 10       # max neighbor chunks added to the rerank pool
+    graph_rerank_boost: float = 0.0   # >0: boost a chunk's score if graph-connected
+                                      # to other high scorers (graph-aware reranking)
+    # Personalized-PageRank context selection (Aider-style): rank the connected
+    # subgraph from the top retrieval seeds and add the highest-PPR nodes to the
+    # rerank pool — graph used to *select* context, not blindly expand neighbors.
+    graph_pagerank: bool = False
+    graph_pagerank_seeds: int = 5     # retrieval hits used as PPR restart set
+    graph_pagerank_add: int = 8       # top-PPR connected nodes to add to the pool
+    # Weighted RRF: scale dense vs lexical before rank-fusion (1.0/1.0 = plain RRF).
+    dense_weight: float = 1.0
+    bm25_weight: float = 1.0
+    # MMR diversity on the final selection (reduce near-duplicate chunks).
+    use_mmr: bool = False
+    mmr_lambda: float = 0.7           # 1.0 = pure relevance, 0 = pure diversity
+    # HyDE (opt-in): draft a hypothetical code snippet from the query with the LLM
+    # and embed THAT for dense search — helps when question vocabulary != code.
+    use_hyde: bool = False
 
     # --- Generation (§4) --------------------------------------------------
     context_token_budget: int = 6000  # cap on source code tokens in the prompt
     gen_max_tokens: int = 4096
     include_graph_context: bool = True  # add a compact neighbor map to the prompt
+    # Self-repair (opt-in): if a first answer's faithfulness is below this, retry
+    # once with a stricter "cite-or-drop" instruction and keep the better one.
+    self_repair_threshold: float = 0.0  # 0 = off; e.g. 0.8 to enable
+
+    # --- Token efficiency -------------------------------------------------
+    # Safe savers (default on): they remove redundancy/whitespace/irrelevant tail
+    # without cutting relevant code, so answer quality is preserved.
+    dedup_sources: bool = True            # drop content-identical source chunks
+    merge_adjacent_sources: bool = True   # merge contiguous same-file spans (1 header)
+    compact_source_code: bool = True      # collapse blank lines / trailing whitespace
+    drop_negative_rerank: bool = True     # drop sources the reranker scores irrelevant (<0)
+    min_sources: int = 3                  # ...but never gate below this many
+    # Riskier saver (opt-in): trims large chunks to query-relevant lines — can drop
+    # code the answer needs, so it's OFF by default.
+    trim_sources: bool = False
+    max_source_tokens: int = 400          # per-source cap, used only when trim_sources
+    # Faithfulness judge cost.
+    judge_source_tokens: int = 300        # cap source code sent to the judge
+    faithfulness_single_call: bool = True # one judge call (extract+verify) vs two
+    faithfulness_skip_when_clean: bool = False  # opt-in: skip judge if structurally clean
 
     # --- Storage ----------------------------------------------------------
     index_dir: str = ".coderag_index"
