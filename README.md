@@ -1,5 +1,10 @@
 # Code RAG
 
+![tests](https://img.shields.io/badge/tests-137%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+![providers](https://img.shields.io/badge/LLM-Anthropic%20%7C%20OpenAI--compatible-blueviolet)
+
 A code-aware retrieval-augmented generation system. It indexes a codebase on
 **AST boundaries** (not character windows) across **~all languages** — precise,
 empirically-derived specs for **18 mainstream languages** (Python, JS, TS, Go,
@@ -224,13 +229,32 @@ python -m coderag.cli update /path/to/fastapi
 python -m coderag.cli update /path/to/fastapi --git <old_sha> <new_sha>
 ```
 
+**▶ See it work in 30 seconds (no API key needed — retrieval is local).** Dogfooded
+on this repo (`coderag index coderag`); real output:
+
+```text
+$ coderag query "reciprocal rank fusion of two ranked lists" --retrieve-only
+Retrieved 6 chunks for: reciprocal rank fusion of two ranked lists
+
+  [1] retrieve/retriever.py:40-51  rrf                        (score 5.427)
+  [2] retrieve/retriever.py:1-24   retrieve/retriever.py      (score 0.807)
+  [3] eval/metrics.py:58-63        reciprocal_rank            (score -0.266)
+  ...
+```
+
+It pinpoints the `rrf` function — by *meaning*, with no keyword in common beyond
+the concept. Add a provider key (above) and drop `--retrieve-only` to get a grounded,
+`[n]`-cited answer plus a faithfulness score. *(Want an animated GIF? `vhs
+scripts/demo.tape` renders one.)*
+
 **Interactive chat** (`chat`) loads the index once and runs a REPL: ask questions
 (cited answers), or use `/retrieve <q>`, `/graph <symbol>`, `/sources`, `/stats`,
 `/help`, `/quit`.
 
 **Graph visualizer/editor.** `graph-export` renders a focused subgraph (or a
 degree-capped overview) as a standalone **interactive HTML** page with a **node
-search box** (matches highlight gold + dim the rest + zoom), or `dot`/`mermaid`.
+search box** (matches keep their own color with a dark outline while the rest dim,
+and the view zooms to them), or `dot`/`mermaid`.
 **Layout** is auto-chosen: a fragmented **overview** defaults to **force** (ForceAtlas2
 — spreads into clusters, auto-settles), while a **focused** view (`--symbol Foo
 --depth 2`) is connected so it defaults to the layered **tree** (LR). Both are toggle
@@ -430,7 +454,33 @@ paying for) many chunks or dumping whole files. With it:
    a handful of tokens but tells the model how the pieces fit.
 
 Inspect it directly with `coderag.cli graph --symbol <name>` or
-`--file <path>`.
+`--file <path>`. Here's a real one this repo emits for `CodeIndex`
+(`coderag graph-export --symbol CodeIndex --depth 1 --format mermaid`) — `contains`
+its methods, `calls` between them, and the modules that `import` it:
+
+```mermaid
+graph LR
+  CodeIndex["CodeIndex"]
+  build["build"]; reg["_register_parse"]; emb["_embed_and_index"]; stats["stats"]
+  rebuild["rebuild_graph"]; allp["_all_parses"]; add["add_files"]
+  cli["cli.py"]; inc["incremental.py"]; run["run.py"]
+  CodeIndex -->|contains| build
+  CodeIndex -->|contains| rebuild
+  CodeIndex -->|contains| add
+  CodeIndex -->|contains| stats
+  build -->|calls| reg
+  build -->|calls| emb
+  build -->|calls| stats
+  rebuild -->|calls| build
+  rebuild -->|calls| allp
+  add -->|calls| rebuild
+  cli -->|imports| CodeIndex
+  inc -->|imports| CodeIndex
+  run -->|imports| CodeIndex
+```
+
+For an interactive, editable view use `graph-export --format html` or the live
+`graph-serve` (drag to add edges, search, reset).
 
 ---
 
