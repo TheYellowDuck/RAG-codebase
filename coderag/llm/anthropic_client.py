@@ -35,7 +35,11 @@ class AnthropicClient(LLMClient):
             )
         from .deps import ensure_sdk
         anthropic = ensure_sdk("anthropic", "anthropic")
-        self._client = anthropic.Anthropic()
+        # The SDK implements exponential backoff; we just bound it (defaults kept
+        # when the env knobs are unset). See coderag/resilience.py.
+        opts = {k: v for k, v in (("timeout", config.timeout),
+                                  ("max_retries", config.max_retries)) if v is not None}
+        self._client = anthropic.Anthropic(**opts)
 
     def generate(self, system: str, user: str, *, max_tokens: int,
                  stream: bool = False) -> Completion:

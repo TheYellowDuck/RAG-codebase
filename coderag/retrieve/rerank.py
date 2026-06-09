@@ -29,7 +29,9 @@ class Reranker:
                     "sentence-transformers is not installed. Run:\n"
                     "    pip install -r requirements.txt"
                 ) from e
-            self._model = CrossEncoder(self.model_name)
+            from ..resilience import with_retry  # retry flaky model download
+            self._model = with_retry(lambda: CrossEncoder(self.model_name),
+                                     desc=f"load rerank model '{self.model_name}'")
         return self._model
 
     def rerank(self, query: str, candidates: list[Chunk],

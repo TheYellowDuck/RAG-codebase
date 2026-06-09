@@ -36,7 +36,13 @@ class Embedder:
             trust = os.environ.get(
                 "CODERAG_EMBED_TRUST_REMOTE_CODE", "").lower() in ("1", "true", "yes")
             kwargs = {"trust_remote_code": True} if trust else {}
-            self._model = SentenceTransformer(self.model_name, **kwargs)
+            # Model download/load has no SDK-level retry — wrap it so a flaky
+            # network doesn't fail the whole index/query (bad model names still
+            # fail fast: they're not transient).
+            from ..resilience import with_retry
+            self._model = with_retry(
+                lambda: SentenceTransformer(self.model_name, **kwargs),
+                desc=f"load embed model '{self.model_name}'")
         return self._model
 
     @property

@@ -32,6 +32,11 @@ class OpenAIClient(LLMClient):
         kwargs = {}
         if config.base_url:
             kwargs["base_url"] = config.base_url
+        # SDK does the backoff; we bound it (defaults kept when env knobs unset).
+        if config.timeout is not None:
+            kwargs["timeout"] = config.timeout
+        if config.max_retries is not None:
+            kwargs["max_retries"] = config.max_retries
         self._client = openai.OpenAI(**kwargs)  # reads OPENAI_API_KEY from env
 
     def generate(self, system: str, user: str, *, max_tokens: int,

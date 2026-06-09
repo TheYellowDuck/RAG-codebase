@@ -178,6 +178,11 @@ class LLMConfig:
     gen_model: str = "claude-opus-4-8"
     judge_model: str = "claude-opus-4-8"
     base_url: "str | None" = None
+    # Resilience knobs (passed to the provider SDK, which implements the actual
+    # exponential backoff). Default None = keep the SDK's own default; set
+    # CODERAG_LLM_TIMEOUT (seconds) / CODERAG_LLM_MAX_RETRIES to bound them in prod.
+    timeout: "float | None" = None
+    max_retries: "int | None" = None
 
     @classmethod
     def from_env(cls) -> "LLMConfig":
@@ -189,4 +194,22 @@ class LLMConfig:
         base_url = None
         if provider == "openai":
             base_url = os.environ.get("CODERAG_LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
-        return cls(provider=provider, gen_model=gen, judge_model=judge, base_url=base_url)
+        return cls(provider=provider, gen_model=gen, judge_model=judge, base_url=base_url,
+                   timeout=_env_float("CODERAG_LLM_TIMEOUT"),
+                   max_retries=_env_int("CODERAG_LLM_MAX_RETRIES"))
+
+
+def _env_float(name: str) -> "float | None":
+    v = os.environ.get(name)
+    try:
+        return float(v) if v not in (None, "") else None
+    except ValueError:
+        return None
+
+
+def _env_int(name: str) -> "int | None":
+    v = os.environ.get(name)
+    try:
+        return int(v) if v not in (None, "") else None
+    except ValueError:
+        return None
