@@ -557,3 +557,41 @@ coderag eval --index .idx_other --golden data/other.jsonl
 - **Embedding truncation:** small general models (e.g. all-MiniLM, 256 tokens)
   truncate large chunks — the context header goes first so signature/location
   survive. Use a longer-context code model via `CODERAG_EMBED_MODEL` if needed.
+
+---
+
+## Productionization roadmap
+
+This is a **rigorously tested reference implementation**, not a deployed service —
+and the difference is deliberate. It is production-grade on *correctness* (137 tests
++ CI, an eval harness with confidence intervals, secret hygiene) but intentionally
+leaves the *serving/ops* layer out of scope. If you were to run it as a service, here
+is the honest gap list, in priority order. (The first item is **done** — included as
+a demonstrated slice.)
+
+1. **Resilience on external calls — ✅ done.** LLM API calls get exponential backoff
+   from the provider SDKs; `timeout` + `max_retries` are now first-class and
+   configurable (`CODERAG_LLM_TIMEOUT`, `CODERAG_LLM_MAX_RETRIES`) instead of relying
+   on undocumented defaults. Local model loading (HF download — no SDK retry) is
+   wrapped in `with_retry` (backoff + jitter, transient-only). See
+   [coderag/resilience.py](coderag/resilience.py).
+2. **Observability.** A stdlib logger is wired (`CODERAG_LOG_LEVEL`); a real
+   deployment would add structured logs, metrics (latency/recall/cost), and tracing
+   rather than the `print()` diagnostics used for CLI UX.
+3. **A real API surface.** Today it's CLI + an MCP server + a localhost graph viz.
+   Production needs an ASGI service (FastAPI/uvicorn) with auth, rate limiting,
+   request validation, and `/health`/`/ready` endpoints.
+4. **Scalable vector store.** [vector_store.py](coderag/index/vector_store.py) is an
+   in-memory brute-force matmul — O(N) per query, all in RAM. Great to ~10⁵ chunks
+   (Django: 40k, 47 ms/query); beyond that, swap in FAISS/HNSW/pgvector behind the
+   same `search()` interface (the code is structured for it).
+5. **Concurrency & state.** Single-process, in-memory index; `graph-serve` writes
+   `graph.json` live with no locking. A service needs concurrent-read safety,
+   transactional index updates, and an index-migration path (`INDEX_VERSION` exists
+   but has no upgrade logic yet).
+6. **Deploy & cost.** Dockerfile + healthcheck + deploy manifests; pinned deps in the
+   image (the runtime SDK auto-install is a dev convenience, an anti-pattern in prod);
+   secrets via a manager rather than `.env`; LLM spend quotas + a response cache.
+
+The point of listing this explicitly: knowing *what's missing and in what order* is
+the production-readiness skill — more so than half-building the serving layer here.
