@@ -38,6 +38,10 @@ mcp = [
 bench = [
     "datasets>=2.0",
 ]
+# Approximate vector backend (HNSW) for large indexes: CODERAG_VECTOR_BACKEND=hnsw.
+ann = [
+    "hnswlib>=0.8",
+]
 dev = [
     "pytest>=7.0",
     "tree-sitter-language-pack>=0.7.0",

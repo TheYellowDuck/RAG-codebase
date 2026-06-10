@@ -112,6 +112,16 @@ class Settings:
     # --- Storage ----------------------------------------------------------
     index_dir: str = ".coderag_index"
 
+    # --- Vector backend ---------------------------------------------------
+    # "exact" = brute-force cosine matmul (default; exact, dependency-free, ideal
+    # to ~10^5 chunks). "hnsw" = approximate ANN (hnswlib) for large indexes —
+    # trades a little recall for sublinear queries. Same search() interface either
+    # way. Set CODERAG_VECTOR_BACKEND=hnsw (needs `pip install 'coderag[ann]'`).
+    vector_backend: str = "exact"
+    hnsw_m: int = 16                  # graph degree (build-time accuracy/memory)
+    hnsw_ef_construction: int = 200   # build-time accuracy/speed
+    hnsw_ef_search: int = 64          # query-time accuracy/speed (raised to >= k)
+
     @classmethod
     def from_env(cls, **overrides) -> "Settings":
         env_map = {
@@ -120,8 +130,12 @@ class Settings:
             "gen_model": os.environ.get("CODERAG_GEN_MODEL"),
             "judge_model": os.environ.get("CODERAG_JUDGE_MODEL"),
             "index_dir": os.environ.get("CODERAG_INDEX_DIR"),
+            "vector_backend": os.environ.get("CODERAG_VECTOR_BACKEND"),
         }
         kwargs = {k: v for k, v in env_map.items() if v}
+        ef = _env_int("CODERAG_HNSW_EF")
+        if ef is not None:
+            kwargs["hnsw_ef_search"] = ef
         kwargs.update(overrides)
         return cls(**kwargs)
 

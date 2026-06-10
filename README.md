@@ -1,6 +1,6 @@
 # Code RAG
 
-![tests](https://img.shields.io/badge/tests-137%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-143%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![providers](https://img.shields.io/badge/LLM-Anthropic%20%7C%20OpenAI--compatible-blueviolet)
@@ -613,7 +613,7 @@ coderag eval --index .idx_other --golden data/other.jsonl
 ## Productionization roadmap
 
 This is a **rigorously tested reference implementation**, not a deployed service —
-and the difference is deliberate. It is production-grade on *correctness* (137 tests
+and the difference is deliberate. It is production-grade on *correctness* (143 tests
 + CI, an eval harness with confidence intervals, secret hygiene) but intentionally
 leaves the *serving/ops* layer out of scope. If you were to run it as a service, here
 is the honest gap list, in priority order. (The first item is **done** — included as
@@ -631,10 +631,24 @@ a demonstrated slice.)
 3. **A real API surface.** Today it's CLI + an MCP server + a localhost graph viz.
    Production needs an ASGI service (FastAPI/uvicorn) with auth, rate limiting,
    request validation, and `/health`/`/ready` endpoints.
-4. **Scalable vector store.** [vector_store.py](coderag/index/vector_store.py) is an
-   in-memory brute-force matmul — O(N) per query, all in RAM. Great to ~10⁵ chunks
-   (Django: 40k, 47 ms/query); beyond that, swap in FAISS/HNSW/pgvector behind the
-   same `search()` interface (the code is structured for it).
+4. **Scalable vector store — ✅ pluggable backend added.** The default is exact
+   brute-force matmul ([vector_store.py](coderag/index/vector_store.py)) — O(N),
+   *exact*, ideal to ~10⁵ chunks. For large indexes there's now an **optional HNSW
+   backend** ([hnsw_store.py](coderag/index/hnsw_store.py)), a drop-in behind the
+   same `search()` interface: `pip install 'coderag[ann]'` then
+   `CODERAG_VECTOR_BACKEND=hnsw`. Measured on **200k clustered vectors** (≈ real
+   embeddings; D=256):
+
+   | Backend | ms/query | recall@10 vs exact | speedup |
+   |---|---|---|---|
+   | exact (default) | 2.50 | 1.000 | 1× |
+   | hnsw, ef=64 (default) | **0.16** | **0.993** | **16×** |
+   | hnsw, ef=200 | 0.34 | 0.999 | 7× |
+
+   So HNSW is a big win **only at scale** and on **structured** data — exact stays
+   the default because it's exact (no ANN recall confound in the eval harness) and
+   already sub-50 ms to 40k chunks. (IVF-PQ via FAISS or pgvector are the next steps
+   for 10⁷+ / disk-backed corpora.)
 5. **Concurrency & state.** Single-process, in-memory index; `graph-serve` writes
    `graph.json` live with no locking. A service needs concurrent-read safety,
    transactional index updates, and an index-migration path (`INDEX_VERSION` exists

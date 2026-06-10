@@ -22,7 +22,7 @@ from ..embed import Embedder
 from ..ingest import FileInfo, chunk_file, discover_files, get_git_sha
 from ..ingest.chunker import FileParse, SymbolRecord
 from ..graph import CodeGraph
-from .vector_store import VectorStore
+from .vector_store import make_vector_store, load_vector_store
 from .bm25_index import BM25Index
 
 INDEX_VERSION = 1
@@ -38,7 +38,7 @@ class CodeIndex:
         self.chunks: dict[str, Chunk] = {}
         self.manifest: dict[str, dict] = {}
         self.graph_records: dict[str, dict] = {}  # file_path -> {symbols, calls, imports}
-        self.vector_store = VectorStore()
+        self.vector_store = make_vector_store(settings)
         self.bm25 = BM25Index()
         self.graph = CodeGraph()
 
@@ -253,7 +253,7 @@ class CodeIndex:
             with open(gr_path) as f:
                 idx.graph_records = json.load(f)
 
-        idx.vector_store = VectorStore.load(dir_path)
+        idx.vector_store = load_vector_store(settings, dir_path)
         idx.bm25 = BM25Index.load(dir_path)
         idx.graph = CodeGraph.load(os.path.join(dir_path, "graph.json"))
         return idx

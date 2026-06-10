@@ -2,9 +2,10 @@
 
 Kept deliberately simple: a single in-memory float32 matrix plus an id list,
 persisted with numpy. For the repo sizes this project targets (tens of thousands
-of chunks) a brute-force matmul is fast and dependency-free; swapping in FAISS or
-a vector DB later is a drop-in behind this same interface. Vectors are assumed
-L2-normalized by the embedder, so cosine similarity == dot product.
+of chunks) a brute-force matmul is fast, exact, and dependency-free. For large
+indexes there's an opt-in approximate backend (`hnsw_store.HNSWVectorStore`,
+selected by `make_vector_store`) behind this same interface — see CODERAG_VECTOR_BACKEND.
+Vectors are assumed L2-normalized by the embedder, so cosine similarity == dot product.
 """
 from __future__ import annotations
 
@@ -13,6 +14,27 @@ import os
 from typing import Optional
 
 import numpy as np
+
+
+def make_vector_store(settings):
+    """Pick the dense backend from settings: 'exact' (default, brute-force) or
+    'hnsw' (approximate ANN for large indexes). Same interface either way."""
+    backend = (getattr(settings, "vector_backend", "exact") or "exact").lower()
+    if backend == "hnsw":
+        from .hnsw_store import HNSWVectorStore
+        return HNSWVectorStore(M=getattr(settings, "hnsw_m", 16),
+                               ef_construction=getattr(settings, "hnsw_ef_construction", 200),
+                               ef_search=getattr(settings, "hnsw_ef_search", 64))
+    return VectorStore()
+
+
+def load_vector_store(settings, dir_path: str):
+    """Load whichever backend `settings` selects from `dir_path`."""
+    backend = (getattr(settings, "vector_backend", "exact") or "exact").lower()
+    if backend == "hnsw":
+        from .hnsw_store import HNSWVectorStore
+        return HNSWVectorStore.load(dir_path)
+    return VectorStore.load(dir_path)
 
 
 class VectorStore:
