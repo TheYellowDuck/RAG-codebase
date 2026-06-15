@@ -32,7 +32,16 @@ class Settings:
     # 0.95. For an even stronger option use jinaai/jina-embeddings-v2-base-code
     # with CODERAG_EMBED_TRUST_REMOTE_CODE=1; for a tiny/fast general model use
     # sentence-transformers/all-MiniLM-L6-v2. Override via CODERAG_EMBED_MODEL.
+    # Default stays the code-specific model: it beats general retrievers on *in-repo*
+    # code search (FastAPI golden recall@5 0.885 vs e5-base-v2's 0.840), even though
+    # e5 wins the docstring→solution task (HumanEval 0.97 vs 0.81). No universal
+    # winner — embedder choice is task-dependent (RESULTS §1). Swap via CODERAG_EMBED_MODEL;
+    # asymmetric models (e5/bge) get their query/passage prefixes auto-applied.
     embed_model: str = "flax-sentence-embeddings/st-codesearch-distilroberta-base"
+    # Asymmetric models need query/passage prefixes; None = auto-infer from the model
+    # name (embed.infer_prefixes). Set explicitly to override.
+    embed_query_prefix: "str | None" = None
+    embed_doc_prefix: "str | None" = None
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # NOTE: the generation/judging model + provider are resolved at *runtime* from
     # the environment via LLMConfig (below), not pinned into the index — so anyone

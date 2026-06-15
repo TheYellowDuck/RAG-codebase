@@ -58,10 +58,10 @@ def evaluate_codesearchnet(path: str, embedder=None, k: int = 10,
         return {"n": 0}
     if embedder is None:
         from ..embed import Embedder
-        embedder = Embedder(Settings().embed_model)
+        embedder = Embedder.from_settings(Settings.from_env())
 
     code_vecs = embedder.encode([e["code"] for e in examples])
-    query_vecs = embedder.encode([e["query"] for e in examples])
+    query_vecs = embedder.encode([e["query"] for e in examples], is_query=True)
     sims = query_vecs @ code_vecs.T   # vectors are L2-normalized -> cosine
 
     n = len(examples)

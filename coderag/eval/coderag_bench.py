@@ -107,9 +107,9 @@ def evaluate_coderag_bench(path: Optional[str] = None, *, embedder=None, k: int 
     # Dense ranking (always computed): cosine over L2-normalized vectors.
     if embedder is None:
         from ..embed import Embedder
-        embedder = Embedder(Settings().embed_model)
+        embedder = Embedder.from_settings(Settings.from_env())
     doc_vecs = embedder.encode(docs)
-    q_vecs = embedder.encode(queries)
+    q_vecs = embedder.encode(queries, is_query=True)
     sims = q_vecs @ doc_vecs.T
     dense_rank = [[ids[j] for j in np.argsort(-sims[i])] for i in range(len(recs))]
 

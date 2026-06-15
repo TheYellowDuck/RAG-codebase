@@ -84,6 +84,25 @@ overlapping CIs — many questions name identifiers that any retriever can latch
 onto, and multi-hop answers need *several* files which no embedder nails alone.
 Honest takeaway: tune the embedder first, but it isn't a silver bullet.
 
+**Two follow-ups that kept us from chasing the wrong lever:**
+
+1. **Recall is candidate-bound, not ordering-bound.** Dense recall@k on FastAPI is
+   *flat* — 0.817 @3, 0.885 @5, 0.892 @10, **0.892 @40**. The relevant file is either
+   in the top handful or not retrieved at all; it never sits at ranks 6–40. So
+   reranking, MMR, and diversification **cannot** raise recall here (nothing to
+   promote) — the ceiling is candidate generation (the embedder). A useful negative:
+   don't tune the reranker to fix a recall problem.
+
+2. **No universal-winner embedder — choice is task-dependent.** A modern general
+   retriever, `intfloat/e5-base-v2` (with `query:`/`passage:` prefixes — now
+   auto-applied, see embed/infer_prefixes), **wins big on docstring→solution**
+   (HumanEval recall@10 **0.97 vs 0.81**) but **loses on in-repo code search**
+   (FastAPI recall@5 **0.840 vs 0.885**). Different tasks reward different embedders,
+   so the default stays the code-specific model (best for the primary in-repo task);
+   e5 is one env var away (`CODERAG_EMBED_MODEL=intfloat/e5-base-v2`) for
+   docstring-heavy corpora. Swapping embedders is now frictionless — asymmetric models
+   get their prefixes automatically.
+
 ## 2. Config ablation (100-q, code embedder) — recall@5 with bootstrap CIs
 
 Scaffolded questions originally *named both symbols* (`How does X use Y?`), which

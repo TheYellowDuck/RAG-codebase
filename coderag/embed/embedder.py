@@ -15,10 +15,33 @@ from typing import Optional
 import numpy as np
 
 
+def infer_prefixes(model_name: str) -> tuple[str, str]:
+    """Many modern retrieval embedders are *asymmetric* — they need a query prefix
+    and a passage prefix or recall craters. We infer them from the model name so
+    swapping models 'just works' (override via Settings.embed_query/doc_prefix).
+    Returns (query_prefix, doc_prefix); empty for symmetric models like the default."""
+    n = model_name.lower()
+    if "e5" in n:                       # intfloat/e5-*, multilingual-e5-*
+        return ("query: ", "passage: ")
+    if "bge" in n and "-en" in n:       # BAAI/bge-*-en-v1.5
+        return ("Represent this sentence for searching relevant passages: ", "")
+    return ("", "")
+
+
 class Embedder:
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, *, query_prefix: Optional[str] = None,
+                 doc_prefix: Optional[str] = None):
         self.model_name = model_name
+        auto_q, auto_d = infer_prefixes(model_name)
+        self.query_prefix = auto_q if query_prefix is None else query_prefix
+        self.doc_prefix = auto_d if doc_prefix is None else doc_prefix
         self._model = None
+
+    @classmethod
+    def from_settings(cls, settings) -> "Embedder":
+        return cls(settings.embed_model,
+                   query_prefix=getattr(settings, "embed_query_prefix", None),
+                   doc_prefix=getattr(settings, "embed_doc_prefix", None))
 
     @property
     def model(self):
@@ -50,10 +73,14 @@ class Embedder:
         return int(self.model.get_sentence_embedding_dimension())
 
     def encode(self, texts: list[str], batch_size: int = 64,
-               show_progress: bool = False) -> np.ndarray:
-        """Embed a batch of documents. Returns float32, L2-normalized (N, D)."""
+               show_progress: bool = False, is_query: bool = False) -> np.ndarray:
+        """Embed a batch. Returns float32, L2-normalized (N, D). `is_query` selects
+        the query vs document prefix (a no-op for symmetric models)."""
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
+        prefix = self.query_prefix if is_query else self.doc_prefix
+        if prefix:
+            texts = [prefix + t for t in texts]
         vecs = self.model.encode(
             texts, batch_size=batch_size, normalize_embeddings=True,
             show_progress_bar=show_progress, convert_to_numpy=True,
@@ -62,4 +89,4 @@ class Embedder:
 
     def encode_query(self, query: str) -> np.ndarray:
         """Embed a single query with the same model (§3.1). Returns (D,)."""
-        return self.encode([query])[0]
+        return self.encode([query], is_query=True)[0]

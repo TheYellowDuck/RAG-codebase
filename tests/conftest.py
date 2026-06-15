@@ -17,7 +17,7 @@ class StubEmbedder:
     model_name = "stub"
     dim = 64
 
-    def encode(self, texts, batch_size=64, show_progress=False):
+    def encode(self, texts, batch_size=64, show_progress=False, is_query=False):
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for i, t in enumerate(texts):
             for tok in code_tokens(t):

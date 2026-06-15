@@ -31,7 +31,7 @@ INDEX_VERSION = 1
 class CodeIndex:
     def __init__(self, settings: Settings, embedder: Optional[Embedder] = None):
         self.settings = settings
-        self.embedder = embedder or Embedder(settings.embed_model)
+        self.embedder = embedder or Embedder.from_settings(settings)
         self.repo = ""
         self.repo_path = ""
         self.git_sha = "nogit"
