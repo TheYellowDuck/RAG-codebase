@@ -300,6 +300,13 @@ LLM rerankers) and implemented the worthwhile ones. Two didn't transfer; one did
   on *both* small and at-scale repos. The cost is one LLM call per query, so it ships
   **opt-in** (`llm_rerank=True` / `--llm-rerank`), a "premium" mode — but unlike
   everything else this session, its recall gain is real and significant.
+- **And it lifts the *other* gap too — answer-correctness.** Better-ranked context
+  means the generator gets the right material: same questions, same Haiku generator +
+  Sonnet judge, default retrieval vs LLM-reranked retrieval — **correctness 0.725 →
+  0.900 (+0.175, n=20, p=0.064).** Not quite significant (n=20, CI lower bound at 0),
+  but a large effect that pushes correctness from *below* the ~0.85 bar to *above* it.
+  So the LLM reranker is the single lever that addresses **both** open gaps —
+  retrieval recall (significantly) and answer-correctness (strongly, near-significant).
 
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any

@@ -1,6 +1,6 @@
 # Code RAG
 
-![tests](https://img.shields.io/badge/tests-143%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-154%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![providers](https://img.shields.io/badge/LLM-Anthropic%20%7C%20OpenAI--compatible-blueviolet)
@@ -33,7 +33,7 @@ numbered section there. New to RAG / embeddings / the eval methodology? Start wi
 | External — CodeSearchNet (800 docstring→code) | recall@10 **0.985** · MRR 0.948 |
 | External — HumanEval (164 problem→solution) | hybrid recall@10 **0.860** · MRR 0.543 |
 | Scale — Django (521k LOC, ~40k chunks) | BM25 adds **+0.10** recall@5 (paired test significant) |
-| Test suite | **143 passing** |
+| Test suite | **154 passing** |
 
 Everything is reproducible (`coderag eval`, `coderag bench …`) and reported with
 **bootstrap confidence intervals + paired significance** — full detail in
@@ -61,8 +61,10 @@ reproduce-the-old-number-then-remeasure):
   *generator* (+0.05) it barely moved — a **genuine** ceiling, gated by retrieval
   misses and hard questions, not measurement. Reported honestly, not inflated.
 
-**Net:** retrieval and faithfulness are at the production bar; **correctness (~0.78)
-and at-scale recall (0.77) are the two honest gaps that remain.**
+**Net:** in the *default*, retrieval and faithfulness are at the production bar;
+**correctness (~0.78) and at-scale recall (0.77) are the two gaps** — both now
+*addressable* by the opt-in **listwise LLM reranker** below (recall +0.086 p<0.001;
+correctness 0.73→0.90), at one LLM call/query.
 
 **Optional higher-recall embedder — helps focused/external retrieval, not the two
 gaps.** A validated opt-in (`nomic-ai/CodeRankEmbed`, `pip install 'coderag[embed-code]'`
@@ -85,7 +87,9 @@ researching the SOTA (then ruling out Granite and Contextual Retrieval as no-ops
 the winner: show the top-15 fused candidates to the LLM and let it *reason* about
 relevance — it disambiguates near-duplicate symbols where every cross-encoder failed.
 **FastAPI recall@5 0.744 → 0.830 (+0.086, p<0.001)**; Django +0.062 (n=40, underpowered).
-Costs one LLM call/query, so it's an opt-in "premium" mode (`--llm-rerank` /
+And it lifts the *other* gap too: **answer-correctness 0.725 → 0.900 (+0.175, n=20,
+p=0.064)** — better-ranked context gives the generator the right material. So one opt-in
+addresses *both* gaps. Costs one LLM call/query, a "premium" mode (`--llm-rerank` /
 `llm_rerank=True`). See [RESULTS.md](RESULTS.md) §3c.
 
 ## What's interesting (the honest findings)
@@ -665,7 +669,7 @@ coderag eval --index .idx_other --golden data/other.jsonl
 ## Productionization roadmap
 
 This is a **rigorously tested reference implementation**, not a deployed service —
-and the difference is deliberate. It is production-grade on *correctness* (143 tests
+and the difference is deliberate. It is production-grade on *correctness* (154 tests
 + CI, an eval harness with confidence intervals, secret hygiene) but intentionally
 leaves the *serving/ops* layer out of scope. If you were to run it as a service, here
 is the honest gap list, in priority order. (The first item is **done** — included as
