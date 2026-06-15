@@ -64,6 +64,11 @@ reproduce-the-old-number-then-remeasure):
 **Net:** retrieval and faithfulness are at the production bar; **correctness (~0.78)
 and at-scale recall (0.77) are the two honest gaps that remain.**
 
+**Optional higher-recall embedder.** A validated opt-in (`nomic-ai/CodeRankEmbed`,
+`pip install 'coderag[embed-code]'` + `CODERAG_EMBED_TRUST_REMOTE_CODE=1`) lifts
+HumanEval recall@10 **0.81→0.99** and in-repo ranking **MRR 0.85→0.92** — kept opt-in
+(not default) because it runs custom remote code. See [RESULTS.md](RESULTS.md) §1.
+
 ## What's interesting (the honest findings)
 
 The point isn't "it works" — it's **measuring what moves the needle and reporting

@@ -21,6 +21,8 @@ def infer_prefixes(model_name: str) -> tuple[str, str]:
     swapping models 'just works' (override via Settings.embed_query/doc_prefix).
     Returns (query_prefix, doc_prefix); empty for symmetric models like the default."""
     n = model_name.lower()
+    if "coderank" in n or ("nomic" in n and "code" in n):   # nomic-ai/CodeRankEmbed
+        return ("Represent this query for searching relevant code: ", "")
     if "e5" in n:                       # intfloat/e5-*, multilingual-e5-*
         return ("query: ", "passage: ")
     if "bge" in n and "-en" in n:       # BAAI/bge-*-en-v1.5
@@ -28,20 +30,32 @@ def infer_prefixes(model_name: str) -> tuple[str, str]:
     return ("", "")
 
 
+def infer_max_seq_len(model_name: str) -> Optional[int]:
+    """Some long-context embedders (e.g. CodeRankEmbed, 8192 tok) explode memory on
+    batched padding ('Invalid buffer size') when indexing a real repo. Code chunks
+    are small, so cap such models to a sane length. None = use the model's default."""
+    n = model_name.lower()
+    if "coderank" in n or ("nomic" in n and "code" in n):
+        return 512
+    return None
+
+
 class Embedder:
     def __init__(self, model_name: str, *, query_prefix: Optional[str] = None,
-                 doc_prefix: Optional[str] = None):
+                 doc_prefix: Optional[str] = None, max_seq_len: Optional[int] = None):
         self.model_name = model_name
         auto_q, auto_d = infer_prefixes(model_name)
         self.query_prefix = auto_q if query_prefix is None else query_prefix
         self.doc_prefix = auto_d if doc_prefix is None else doc_prefix
+        self.max_seq_len = max_seq_len if max_seq_len is not None else infer_max_seq_len(model_name)
         self._model = None
 
     @classmethod
     def from_settings(cls, settings) -> "Embedder":
         return cls(settings.embed_model,
                    query_prefix=getattr(settings, "embed_query_prefix", None),
-                   doc_prefix=getattr(settings, "embed_doc_prefix", None))
+                   doc_prefix=getattr(settings, "embed_doc_prefix", None),
+                   max_seq_len=getattr(settings, "embed_max_seq_len", None))
 
     @property
     def model(self):
@@ -66,6 +80,8 @@ class Embedder:
             self._model = with_retry(
                 lambda: SentenceTransformer(self.model_name, **kwargs),
                 desc=f"load embed model '{self.model_name}'")
+            if self.max_seq_len:        # cap long-context models to avoid memory blowups
+                self._model.max_seq_length = self.max_seq_len
         return self._model
 
     @property

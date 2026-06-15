@@ -42,6 +42,7 @@ class Settings:
     # name (embed.infer_prefixes). Set explicitly to override.
     embed_query_prefix: "str | None" = None
     embed_doc_prefix: "str | None" = None
+    embed_max_seq_len: "int | None" = None   # cap for long-context models (None=auto)
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # NOTE: the generation/judging model + provider are resolved at *runtime* from
     # the environment via LLMConfig (below), not pinned into the index — so anyone
@@ -148,6 +149,9 @@ class Settings:
         ef = _env_int("CODERAG_HNSW_EF")
         if ef is not None:
             kwargs["hnsw_ef_search"] = ef
+        msl = _env_int("CODERAG_EMBED_MAX_SEQ_LEN")
+        if msl is not None:
+            kwargs["embed_max_seq_len"] = msl
         kwargs.update(overrides)
         return cls(**kwargs)
 

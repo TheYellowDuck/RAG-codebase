@@ -8,14 +8,23 @@ import numpy as np
 
 from coderag.config import Settings
 from coderag.embed import Embedder
-from coderag.embed.embedder import infer_prefixes
+from coderag.embed.embedder import infer_prefixes, infer_max_seq_len
 
 
 def test_infer_prefixes_by_model_name():
     assert infer_prefixes("intfloat/e5-base-v2") == ("query: ", "passage: ")
     assert infer_prefixes("BAAI/bge-base-en-v1.5")[0].startswith("Represent")
+    assert infer_prefixes("nomic-ai/CodeRankEmbed")[0].startswith("Represent this query")
     # symmetric / unknown models get no prefix (no behavior change)
     assert infer_prefixes("flax-sentence-embeddings/st-codesearch-distilroberta-base") == ("", "")
+
+
+def test_infer_max_seq_len_caps_long_context_models():
+    assert infer_max_seq_len("nomic-ai/CodeRankEmbed") == 512   # avoid the 192GiB blowup
+    assert infer_max_seq_len("flax-sentence-embeddings/st-codesearch-distilroberta-base") is None
+    # explicit override wins over the auto-cap
+    e = Embedder("nomic-ai/CodeRankEmbed", max_seq_len=256)
+    assert e.max_seq_len == 256
 
 
 class _FakeModel:

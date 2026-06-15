@@ -42,6 +42,11 @@ bench = [
 ann = [
     "hnswlib>=0.8",
 ]
+# Higher-recall code embedder (CodeRankEmbed) — wins HumanEval + in-repo, but ships
+# custom model code (needs einops + CODERAG_EMBED_TRUST_REMOTE_CODE=1).
+embed-code = [
+    "einops>=0.7",
+]
 dev = [
     "pytest>=7.0",
     "tree-sitter-language-pack>=0.7.0",

@@ -93,15 +93,25 @@ Honest takeaway: tune the embedder first, but it isn't a silver bullet.
    promote) — the ceiling is candidate generation (the embedder). A useful negative:
    don't tune the reranker to fix a recall problem.
 
-2. **No universal-winner embedder — choice is task-dependent.** A modern general
-   retriever, `intfloat/e5-base-v2` (with `query:`/`passage:` prefixes — now
-   auto-applied, see embed/infer_prefixes), **wins big on docstring→solution**
-   (HumanEval recall@10 **0.97 vs 0.81**) but **loses on in-repo code search**
-   (FastAPI recall@5 **0.840 vs 0.885**). Different tasks reward different embedders,
-   so the default stays the code-specific model (best for the primary in-repo task);
-   e5 is one env var away (`CODERAG_EMBED_MODEL=intfloat/e5-base-v2`) for
-   docstring-heavy corpora. Swapping embedders is now frictionless — asymmetric models
-   get their prefixes automatically.
+2. **The embedder lever still has headroom — but the model class matters.** Tested
+   two upgrades (prefixes auto-applied, see embed/infer_prefixes):
+
+   | Embedder | HumanEval recall@10 | FastAPI recall@5 | FastAPI MRR |
+   |---|---|---|---|
+   | `st-codesearch` (default) | 0.811 | 0.885 | 0.848 |
+   | `e5-base-v2` (general) | 0.970 | 0.840 ↓ | — |
+   | **`CodeRankEmbed` (code)** | **0.994** | **0.896** | **0.920** |
+
+   A *general* retriever (e5) wins docstring→solution but **regresses in-repo search** —
+   task-dependent, so not a safe default. A strong *code* embedder
+   (`nomic-ai/CodeRankEmbed`) wins **both**: +0.18 on HumanEval and, in-repo, a tied
+   recall@5 with a large **MRR gain (0.848→0.920)** — it ranks the answer file much
+   higher. It's a real, validated upgrade. It stays **opt-in, not default**, only
+   because it ships custom model code (needs `pip install 'coderag[embed-code]'` +
+   `CODERAG_EMBED_TRUST_REMOTE_CODE=1` at index *and* query time) — we don't silently
+   enable arbitrary remote code. Its 8k context is auto-capped to avoid a memory
+   blowup (embed/infer_max_seq_len). Enable:
+   `CODERAG_EMBED_MODEL=nomic-ai/CodeRankEmbed CODERAG_EMBED_TRUST_REMOTE_CODE=1`.
 
 ## 2. Config ablation (100-q, code embedder) — recall@5 with bootstrap CIs
 
