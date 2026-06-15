@@ -276,6 +276,31 @@ per-query PPR on a 40k-node graph was seconds/query until `personalized_pagerank
 made to cache its adjacency and prune the frontier — necessary for graph_rerank to be
 usable at scale at all.
 
+### 3c. Researching the gaps: three SOTA techniques tried, one significant win
+
+Took the chase to the literature (Contextual Retrieval, CoIR leaders, late-interaction,
+LLM rerankers) and implemented the worthwhile ones. Two didn't transfer; one did.
+
+| Technique (from research) | Result | Kept? |
+|---|---|---|
+| Granite embedder (CoIR-strong) | HumanEval 0.927 < CodeRankEmbed 0.994 | no |
+| Contextual Retrieval (Anthropic, −49% failed retrievals on prose) | FastAPI +0.006 (noise) | no |
+| **Listwise LLM reranker** | **FastAPI +0.086 (p<0.001), Django +0.062** | **yes (opt-in)** |
+
+- **Contextual Retrieval didn't transfer — and the reason is instructive:** our
+  `embed_text` already prepends a structural header (file / class / signature /
+  docstring), so code chunks are *already* contextualized; the LLM blurb is redundant
+  (Anthropic's gain comes from prose chunks that carry no context). A good example of a
+  technique whose value depends on what your chunks already contain.
+- **The listwise LLM reranker is the one lever that significantly moved recall.** Show
+  the top-15 fused candidates to the LLM and let it *reason* about which match the
+  query — it disambiguates near-duplicate symbols where cross-encoders (MiniLM, bge)
+  and graph-PPR could not. **FastAPI recall@5 0.744 → 0.830 (+0.086, p<0.001, n=106)**;
+  Django 0.662 → 0.725 (+0.062, n=40, p=0.23 — same direction, underpowered). It works
+  on *both* small and at-scale repos. The cost is one LLM call per query, so it ships
+  **opt-in** (`llm_rerank=True` / `--llm-rerank`), a "premium" mode — but unlike
+  everything else this session, its recall gain is real and significant.
+
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any
 single small repo the configs look like "no separation"; across three repos of

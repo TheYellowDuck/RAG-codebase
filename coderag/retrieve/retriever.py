@@ -12,6 +12,7 @@ Every flag here is also a settings field, so the eval harness can ablate
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
@@ -73,7 +74,8 @@ class Retriever:
                  use_dense: Optional[bool] = None, use_bm25: Optional[bool] = None,
                  use_rerank: Optional[bool] = None, expand_graph: Optional[bool] = None,
                  use_hyde: Optional[bool] = None,
-                 graph_rerank: Optional[bool] = None) -> list[RetrievedChunk]:
+                 graph_rerank: Optional[bool] = None,
+                 llm_rerank: Optional[bool] = None) -> list[RetrievedChunk]:
         s = self.settings
         k = k or s.final_k
         use_dense = s.use_dense if use_dense is None else use_dense
@@ -114,7 +116,12 @@ class Retriever:
             candidates, graph_rel = self._add_pagerank_to_pool(candidates, s, graph_rel)
 
         graph_rerank = s.graph_rerank if graph_rerank is None else graph_rerank
-        if use_rerank and candidates:
+        llm_rerank = s.llm_rerank if llm_rerank is None else llm_rerank
+        if llm_rerank and candidates:
+            top = self._llm_rerank(query, candidates, k, s.llm_rerank_pool)
+            results = [self._mk(c, 1.0 / (i + 1), i + 1, graph_rel)
+                       for i, c in enumerate(top)]
+        elif use_rerank and candidates:
             scored = self.reranker.rerank(query, candidates, len(candidates))
             if s.graph_rerank_boost > 0:
                 scored = self._apply_connectivity_boost(scored, s.graph_rerank_boost)
@@ -136,6 +143,40 @@ class Retriever:
         if expand_graph and not s.graph_expand_prererank:
             results = self._expand_with_graph(results, s.graph_expand_budget)
         return results
+
+    def _llm_rerank(self, query: str, candidates: list[Chunk], k: int,
+                    pool: int) -> list[Chunk]:
+        """Listwise LLM reranking: show the top-`pool` candidates to the LLM and let
+        it reason about which match the query — disambiguates near-duplicate symbols
+        where cross-encoders fail (the one lever that significantly lifts recall@5,
+        +0.086 on FastAPI p<0.001). Costs one LLM call/query; fails open to fused
+        order on any error (no key, bad output)."""
+        cand = candidates[:pool]
+        if not cand:
+            return candidates[:k]
+        try:
+            if self._llm is None:
+                from ..llm import get_llm_client
+                self._llm = get_llm_client()
+            items = "\n\n".join(
+                f"{i + 1}. {c.file_path}:{c.start_line}\n{(c.code or '')[:240]}"
+                for i, c in enumerate(cand))
+            txt = self._llm.generate(
+                "You rank code-search candidates by relevance to the query.",
+                f"Query: {query}\n\nCandidates:\n{items}\n\nOutput ONLY the numbers of "
+                f"the {k} most relevant candidates, best first, comma-separated.",
+                max_tokens=80).text
+            order: list[int] = []
+            for x in re.findall(r"\d+", txt):
+                o = int(x)
+                if 1 <= o <= len(cand) and o not in order:
+                    order.append(o)
+            ranked = [cand[o - 1] for o in order]
+            chosen = {id(c) for c in ranked}
+            ranked += [c for c in cand if id(c) not in chosen]   # fill from fused order
+            return ranked[:k]
+        except Exception:
+            return candidates[:k]        # fail open
 
     def _graph_rerank(self, candidates: list[Chunk], k: int, seeds: int) -> list[Chunk]:
         """Re-rank the fused pool by rank-fusing its RRF order with a PPR-connectivity

@@ -91,6 +91,13 @@ class Settings:
     # noise, so opt-in. Alternative to use_rerank; ignored when use_rerank is on.
     graph_rerank: bool = False
     graph_rerank_seeds: int = 3       # top fused hits used as the PPR restart set
+    # Listwise LLM reranking: show the top fused candidates to the LLM and let it
+    # reason about relevance — disambiguates symbols where cross-encoders fail. The
+    # one lever that significantly lifts recall@5 (+0.086 FastAPI, p<0.001), but it
+    # costs one LLM call per query, so it's an opt-in "premium" mode. Overrides the
+    # cross-encoder reranker when set.
+    llm_rerank: bool = False
+    llm_rerank_pool: int = 15         # how many fused candidates the LLM ranks
     # Weighted RRF: scale dense vs lexical before rank-fusion (1.0/1.0 = plain RRF).
     dense_weight: float = 1.0
     bm25_weight: float = 1.0

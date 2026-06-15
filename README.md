@@ -80,6 +80,14 @@ is **neutral on small repos** (no cross-encoder). Both within noise, so opt-in �
 it's the only mechanism that captured any of the at-scale ordering headroom.
 See [RESULTS.md](RESULTS.md) §3b.
 
+**Listwise LLM reranking — the one technique with a *significant* recall gain.** From
+researching the SOTA (then ruling out Granite and Contextual Retrieval as no-ops here),
+the winner: show the top-15 fused candidates to the LLM and let it *reason* about
+relevance — it disambiguates near-duplicate symbols where every cross-encoder failed.
+**FastAPI recall@5 0.744 → 0.830 (+0.086, p<0.001)**; Django +0.062 (n=40, underpowered).
+Costs one LLM call/query, so it's an opt-in "premium" mode (`--llm-rerank` /
+`llm_rerank=True`). See [RESULTS.md](RESULTS.md) §3c.
+
 ## What's interesting (the honest findings)
 
 The point isn't "it works" — it's **measuring what moves the needle and reporting
