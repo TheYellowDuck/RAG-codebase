@@ -33,11 +33,36 @@ numbered section there. New to RAG / embeddings / the eval methodology? Start wi
 | External — CodeSearchNet (800 docstring→code) | recall@10 **0.985** · MRR 0.948 |
 | External — HumanEval (164 problem→solution) | hybrid recall@10 **0.860** · MRR 0.543 |
 | Scale — Django (521k LOC, ~40k chunks) | BM25 adds **+0.10** recall@5 (paired test significant) |
-| Test suite | **129 passing** |
+| Test suite | **143 passing** |
 
 Everything is reproducible (`coderag eval`, `coderag bench …`) and reported with
 **bootstrap confidence intervals + paired significance** — full detail in
 [RESULTS.md](RESULTS.md).
+
+### Stats vs a production bar
+
+| Metric | This system | Production bar | Status |
+|---|---|---|---|
+| Retrieval recall@5 — focused repo (FastAPI) | ~0.90 | 0.85–0.95 | ✅ at bar |
+| Retrieval recall@10 — external (CodeSearchNet) | 0.985 | ~0.90 | ✅ above |
+| Retrieval recall@5 — at scale (Django, 521k LOC) | 0.77 | ~0.85 | ⚠️ below at scale |
+| Faithfulness (accurately judged) | **~0.95** | ≥0.90 | ✅ at bar |
+| Answer-correctness | ~0.78 | ~0.85 | ⚠️ below (genuine) |
+| Retrieval latency (40k chunks) | 47 ms/query | <100 ms | ✅ |
+
+Two of these were **re-audited rigorously** this round (same generated answers,
+reproduce-the-old-number-then-remeasure):
+
+- **Faithfulness 0.79 → ~0.95.** The old judge saw only 300 tokens of each source and
+  marked *supported* claims UNSUPPORTED when the supporting line was truncated. Given
+  enough source + a stronger judge it reads ~0.95 — it was a **measurement artifact**,
+  not real ungrounding (fix: `judge_source_tokens` 300→1500).
+- **Answer-correctness ≈0.78 (held).** Under a stronger *judge* (+0.05) and a stronger
+  *generator* (+0.05) it barely moved — a **genuine** ceiling, gated by retrieval
+  misses and hard questions, not measurement. Reported honestly, not inflated.
+
+**Net:** retrieval and faithfulness are at the production bar; **correctness (~0.78)
+and at-scale recall (0.77) are the two honest gaps that remain.**
 
 ## What's interesting (the honest findings)
 

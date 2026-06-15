@@ -291,8 +291,24 @@ not 0.79**: the system was already well-grounded; a cheap, truncated judge under
 it. This resolves the "judge strictness vs genuine ungrounding" question §6 raised — it
 was mostly the judge. Fix shipped: `judge_source_tokens` 300→1500
 ([config.py](coderag/config.py)), and use Sonnet/Opus as the judge for reported
-numbers. (Answer-correctness used the same Haiku@300 judge and is likely under-read
-too — not yet re-measured, so it stays reported as 0.747.)
+numbers. (Answer-correctness used the same Haiku@300 judge — re-audited below.)
+
+**Answer-correctness was re-audited the same way — and it held (it is *not* an
+artifact).** Correctness grades the answer against the reference (no sources, so the
+truncation bug doesn't apply); the only levers are the judge and the generator.
+Tested three ways on FastAPI:
+
+| Setup (same questions) | Correctness |
+|---|---|
+| Haiku gen, Haiku judge (original regime) | 0.725 (n=20) ← reproduces 0.747 |
+| Haiku gen, Sonnet judge (stronger judge) | 0.775 (n=20)  (+0.05) |
+| Sonnet gen, Sonnet judge (stronger generator) | 0.800 (n=10)  (+0.05) |
+
+A stronger judge and a stronger generator each move it only ~+0.05, so **correctness
+is genuinely ≈0.78** — a real ceiling, gated by retrieval misses and genuinely hard
+questions, not by measurement. Honest bottom line: faithfulness was a judge artifact
+(0.79→~0.95); correctness is real (~0.78, below a ~0.85 bar) and the honest remaining
+generation gap.
 
 | Config | Faithfulness | Cite-P | Cite-R | Correct | CtxTok |
 |---|---|---|---|---|---|
