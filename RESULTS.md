@@ -113,6 +113,17 @@ Honest takeaway: tune the embedder first, but it isn't a silver bullet.
    blowup (embed/infer_max_seq_len). Enable:
    `CODERAG_EMBED_MODEL=nomic-ai/CodeRankEmbed CODERAG_EMBED_TRUST_REMOTE_CODE=1`.
 
+   **But — measured honestly — it does not close the two production gaps.** Filling
+   the blank cells: at-scale Django recall@5 is **tied** (dense 0.700 vs 0.67, hybrid
+   0.750 vs 0.767 — within wide CIs, n=40), and answer-correctness **did not improve**
+   (0.65 vs 0.78 on n=20, confounded by generation noise). It's also **~7× slower to
+   index at scale** (~10 min vs 84 s on Django). So the upgrade is real *where
+   retrieval was already decent* (focused repos, docstring tasks), but the at-scale
+   recall and correctness ceilings are **not an embedder problem** — at 40k chunks the
+   bottleneck is disambiguating thousands of similar symbols (where BM25 helps more
+   than any embedder), and correctness is gated by more than retrieval. Honest net:
+   better embedder, same two gaps.
+
 ## 2. Config ablation (100-q, code embedder) — recall@5 with bootstrap CIs
 
 Scaffolded questions originally *named both symbols* (`How does X use Y?`), which

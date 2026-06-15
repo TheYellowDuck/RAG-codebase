@@ -64,10 +64,14 @@ reproduce-the-old-number-then-remeasure):
 **Net:** retrieval and faithfulness are at the production bar; **correctness (~0.78)
 and at-scale recall (0.77) are the two honest gaps that remain.**
 
-**Optional higher-recall embedder.** A validated opt-in (`nomic-ai/CodeRankEmbed`,
-`pip install 'coderag[embed-code]'` + `CODERAG_EMBED_TRUST_REMOTE_CODE=1`) lifts
-HumanEval recall@10 **0.81→0.99** and in-repo ranking **MRR 0.85→0.92** — kept opt-in
-(not default) because it runs custom remote code. See [RESULTS.md](RESULTS.md) §1.
+**Optional higher-recall embedder — helps focused/external retrieval, not the two
+gaps.** A validated opt-in (`nomic-ai/CodeRankEmbed`, `pip install 'coderag[embed-code]'`
++ `CODERAG_EMBED_TRUST_REMOTE_CODE=1`) lifts HumanEval recall@10 **0.81→0.99** and
+in-repo ranking **MRR 0.85→0.92**. But measured honestly, it does **not** close the
+two gaps: at-scale Django recall@5 stays tied (0.75 vs 0.767) and answer-correctness
+didn't improve (0.65 vs 0.78, n=20, noisy). It's also ~7× slower to index at scale
+(~10 min vs 84 s on Django). Kept opt-in (not default) — runs custom remote code, and
+the wins don't justify the cost for everyone. See [RESULTS.md](RESULTS.md) §1.
 
 ## What's interesting (the honest findings)
 
