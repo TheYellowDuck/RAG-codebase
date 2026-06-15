@@ -73,6 +73,13 @@ didn't improve (0.65 vs 0.78, n=20, noisy). It's also ~7× slower to index at sc
 (~10 min vs 84 s on Django). Kept opt-in (not default) — runs custom remote code, and
 the wins don't justify the cost for everyone. See [RESULTS.md](RESULTS.md) §1.
 
+**Graph-aware reranking — the one lever that moved at-scale recall.** After embedder
+and two cross-encoder rerankers all failed at scale, re-ranking the fused pool by
+PageRank-connectivity (`graph_rerank=True`) lifts Django recall@5 **0.662→0.688** and
+is **neutral on small repos** (no cross-encoder). Both within noise, so opt-in — but
+it's the only mechanism that captured any of the at-scale ordering headroom.
+See [RESULTS.md](RESULTS.md) §3b.
+
 ## What's interesting (the honest findings)
 
 The point isn't "it works" — it's **measuring what moves the needle and reporting

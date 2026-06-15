@@ -241,25 +241,31 @@ significance *because the repo is big enough to need it.* (A `bm25_weight` sweep
 Django found the default equal weighting already optimal — 1.0 → 0.767, up/down
 weighting ≤ 0.733 — so no tuning gain; an honest null.)
 
-**Chasing the remaining at-scale recall — diagnosed, then four dead ends.** The recall
-curve is the key: it climbs **0.75 @5 → 0.83 @10 → 0.87 @20**, then plateaus. So ~0.12
-is *ordering-bound* (the right file IS in the top-20, ranked below 5) and ~0.13 is
-*candidate-bound* (never retrieved). The ordering-bound part looks promotable — but
-nothing captured it:
+**Chasing the remaining at-scale recall — diagnosed, then four dead ends and one
+conditional win.** The recall curve is the key: it climbs **0.75 @5 → 0.83 @10 → 0.87
+@20**, then plateaus. So ~0.12 is *ordering-bound* (the right file IS in the top-20,
+ranked below 5) and ~0.13 is *candidate-bound* (never retrieved). The ordering-bound
+part looks promotable:
 
-| Attempt to lift recall@5 | Result |
+| Attempt to lift recall@5 (Django) | Result |
 |---|---|
 | Stronger embedder (CodeRankEmbed) | tied (0.700 dense / 0.750 hybrid) |
 | MiniLM cross-encoder rerank | 0.733 < 0.750 — hurts |
-| **bge-reranker-v2-m3** (strongest general) | 0.637 < 0.662 (same harness) — hurts, and ~16 min on CPU |
+| bge-reranker-v2-m3 (strongest general) | 0.637 < 0.662 (same harness) — hurts, ~16 min/CPU |
 | `bm25_weight` sweep | null (equal optimal) |
+| **graph-aware rerank (PPR-connectivity)** | **0.662 → 0.688 (+0.025)** — the one that helped |
 
-The lesson: a *generic* relevance scorer can't disambiguate near-duplicate symbols
-any better than RRF already does — it reshuffles the top-30 and often demotes the
-true chunk. So the at-scale recall ceiling is **not** fixable by an embedder or
-reranker swap; capturing it needs disambiguation signal (graph-aware reranking, or a
-code-fine-tuned cross-encoder) — a real research project, not a config change. An
-honest negative, like HyDE and the graph.
+Generic relevance scorers can't disambiguate near-duplicate symbols any better than
+RRF — they reshuffle the top-30 and often demote the true chunk. But the **code graph
+can**: re-ranking the fused pool by rank-fusing the RRF order with a personalized-
+PageRank order (seeded by the top hits, `Retriever._graph_rerank`, `graph_rerank=True`)
+promotes pool members that are call/import-connected to the top candidates. It's the
+**only** lever that moved at-scale recall the right way (+0.025), and it's **neutral on
+small repos** (FastAPI 0.744 → 0.739, n=106) — so it doesn't regress the common case.
+Both effects are within CIs (n=40 / 106), so it ships **opt-in, not default**: a
+measured, conditional, no-cross-encoder mechanism, honestly characterized. The
+candidate-bound ~0.13 (files never retrieved) still needs chunking work — genuinely
+open.
 
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any

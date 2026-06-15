@@ -72,7 +72,8 @@ class Retriever:
     def retrieve(self, query: str, *, k: Optional[int] = None,
                  use_dense: Optional[bool] = None, use_bm25: Optional[bool] = None,
                  use_rerank: Optional[bool] = None, expand_graph: Optional[bool] = None,
-                 use_hyde: Optional[bool] = None) -> list[RetrievedChunk]:
+                 use_hyde: Optional[bool] = None,
+                 graph_rerank: Optional[bool] = None) -> list[RetrievedChunk]:
         s = self.settings
         k = k or s.final_k
         use_dense = s.use_dense if use_dense is None else use_dense
@@ -112,6 +113,7 @@ class Retriever:
         if s.graph_pagerank:  # Aider-style: PPR-rank the connected subgraph to select
             candidates, graph_rel = self._add_pagerank_to_pool(candidates, s, graph_rel)
 
+        graph_rerank = s.graph_rerank if graph_rerank is None else graph_rerank
         if use_rerank and candidates:
             scored = self.reranker.rerank(query, candidates, len(candidates))
             if s.graph_rerank_boost > 0:
@@ -119,6 +121,10 @@ class Retriever:
             scored = self._mmr(scored, k, s.mmr_lambda) if s.use_mmr else scored[:k]
             results = [self._mk(c, sc, i + 1, graph_rel)
                        for i, (c, sc) in enumerate(scored)]
+        elif graph_rerank and candidates:
+            top = self._graph_rerank(candidates, k, s.graph_rerank_seeds)
+            results = [self._mk(c, 1.0 / (i + 1), i + 1, graph_rel)
+                       for i, c in enumerate(top)]
         else:
             # Fall back to fused rank; synthesize a descending score.
             top = candidates[:k]
@@ -130,6 +136,18 @@ class Retriever:
         if expand_graph and not s.graph_expand_prererank:
             results = self._expand_with_graph(results, s.graph_expand_budget)
         return results
+
+    def _graph_rerank(self, candidates: list[Chunk], k: int, seeds: int) -> list[Chunk]:
+        """Re-rank the fused pool by rank-fusing its RRF order with a PPR-connectivity
+        order (seeded by the top hits). Promotes pool members graph-connected to the
+        top candidates — breaks near-duplicate-symbol ties without a cross-encoder."""
+        order = [c.id for c in candidates]
+        ppr = self.index.graph.personalized_pagerank(order[:seeds])
+        if not ppr:
+            return candidates[:k]
+        conn = sorted(order, key=lambda cid: ppr.get(cid, 0.0), reverse=True)
+        by_id = {c.id: c for c in candidates}
+        return [by_id[cid] for cid in rrf(order, conn)[:k]]
 
     def _mk(self, chunk: Chunk, score: float, rank: int,
             graph_rel: dict[str, str]) -> RetrievedChunk:

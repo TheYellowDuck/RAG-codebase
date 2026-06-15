@@ -84,6 +84,13 @@ class Settings:
     graph_pagerank: bool = False
     graph_pagerank_seeds: int = 5     # retrieval hits used as PPR restart set
     graph_pagerank_add: int = 8       # top-PPR connected nodes to add to the pool
+    # Graph-aware reranking: re-rank the fused pool by rank-fusing the RRF order with
+    # a PPR-connectivity order (seeded by the top hits) — promotes graph-central
+    # candidates to break near-duplicate-symbol ties, no cross-encoder. The one lever
+    # that helped at scale (Django recall@5 +0.025; neutral on small repos); within
+    # noise, so opt-in. Alternative to use_rerank; ignored when use_rerank is on.
+    graph_rerank: bool = False
+    graph_rerank_seeds: int = 3       # top fused hits used as the PPR restart set
     # Weighted RRF: scale dense vs lexical before rank-fusion (1.0/1.0 = plain RRF).
     dense_weight: float = 1.0
     bm25_weight: float = 1.0

@@ -102,7 +102,7 @@ def _cmd_query(args) -> int:
         args.question, k=args.k,
         use_dense=not args.no_dense, use_bm25=not args.no_bm25,
         use_rerank=not args.no_rerank, expand_graph=args.expand_graph,
-        use_hyde=args.hyde,
+        use_hyde=args.hyde, graph_rerank=args.graph_rerank,
     )
 
     print(f"\nRetrieved {len(results)} chunks for: {args.question}\n")
@@ -516,6 +516,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "it for dense search (needs a provider/key)")
     pq.add_argument("--expand-graph", action="store_true",
                     help="pull code-graph neighbors into context")
+    pq.add_argument("--graph-rerank", action="store_true",
+                    help="re-rank the fused pool by PageRank-connectivity (helps at scale)")
     pq.add_argument("--retrieve-only", action="store_true", help="skip generation")
     pq.add_argument("--no-verify", action="store_true", help="skip faithfulness check")
     pq.add_argument("--model", default=None,
