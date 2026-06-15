@@ -21,6 +21,7 @@ dist/
 
 # --- Project artifacts (large / regenerable) ---
 .coderag_index*/
+.idx_*/
 eval_runs/
 
 # --- Cloned target repos (don't vendor someone else's code) ---
