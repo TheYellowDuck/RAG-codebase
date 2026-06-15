@@ -104,8 +104,11 @@ class Settings:
     # code the answer needs, so it's OFF by default.
     trim_sources: bool = False
     max_source_tokens: int = 400          # per-source cap, used only when trim_sources
-    # Faithfulness judge cost.
-    judge_source_tokens: int = 300        # cap source code sent to the judge
+    # Faithfulness judge: source budget per cited chunk. 300 was too small — the
+    # judge couldn't see the line supporting a claim and returned false UNSUPPORTED,
+    # deflating faithfulness ~0.79→true ~0.95 on FastAPI (see RESULTS §4). 1500
+    # covers most chunks; raise for very large ones (cost is judge tokens only).
+    judge_source_tokens: int = 1500       # cap source code sent to the judge
     faithfulness_single_call: bool = True # one judge call (extract+verify) vs two
     faithfulness_skip_when_clean: bool = False  # opt-in: skip judge if structurally clean
 

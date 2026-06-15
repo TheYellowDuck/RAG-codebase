@@ -350,8 +350,11 @@ cost/benefit, not recall). `SymR@k`/`SymMRR` appear when questions label
 `eval --generate` measures the parts that differentiate this project — grounded,
 cited answers and honest refusal. On the de-confounded 100-q set (Haiku 4.5 judge,
 dense config): answer-correctness **0.747 [0.67–0.82]**, citation precision **0.84**,
-faithfulness **0.79** (i.e. ~1 in 5 claims the judge didn't match to a cited source —
-judge strictness vs. genuine ungrounding is worth probing). And an **honest
+faithfulness **0.79** — but that 0.79 turned out to be a **judge artifact**: the Haiku
+judge saw only 300 tokens of each source, so it marked *supported* claims UNSUPPORTED
+when the supporting line was truncated. Re-measuring the same answers with a fuller
+source budget + a stronger judge gives **faithfulness ≈ 0.95** (fix shipped:
+`judge_source_tokens` 300→1500; details in [RESULTS.md](RESULTS.md) §4). And an **honest
 non-result worth keeping**: auto-expanding the code graph's neighbors showed *no
 measured benefit* — cross-file correctness trended down (Δ **−0.10, 95% CI
 [−0.23, +0.04]**, includes 0) at ~13% fewer tokens. No upside, a downward trend → it
