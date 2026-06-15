@@ -241,6 +241,26 @@ significance *because the repo is big enough to need it.* (A `bm25_weight` sweep
 Django found the default equal weighting already optimal — 1.0 → 0.767, up/down
 weighting ≤ 0.733 — so no tuning gain; an honest null.)
 
+**Chasing the remaining at-scale recall — diagnosed, then four dead ends.** The recall
+curve is the key: it climbs **0.75 @5 → 0.83 @10 → 0.87 @20**, then plateaus. So ~0.12
+is *ordering-bound* (the right file IS in the top-20, ranked below 5) and ~0.13 is
+*candidate-bound* (never retrieved). The ordering-bound part looks promotable — but
+nothing captured it:
+
+| Attempt to lift recall@5 | Result |
+|---|---|
+| Stronger embedder (CodeRankEmbed) | tied (0.700 dense / 0.750 hybrid) |
+| MiniLM cross-encoder rerank | 0.733 < 0.750 — hurts |
+| **bge-reranker-v2-m3** (strongest general) | 0.637 < 0.662 (same harness) — hurts, and ~16 min on CPU |
+| `bm25_weight` sweep | null (equal optimal) |
+
+The lesson: a *generic* relevance scorer can't disambiguate near-duplicate symbols
+any better than RRF already does — it reshuffles the top-30 and often demotes the
+true chunk. So the at-scale recall ceiling is **not** fixable by an embedder or
+reranker swap; capturing it needs disambiguation signal (graph-aware reranking, or a
+code-fine-tuned cross-encoder) — a real research project, not a config change. An
+honest negative, like HyDE and the graph.
+
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any
 single small repo the configs look like "no separation"; across three repos of
