@@ -173,30 +173,45 @@ class CodeGraph:
         return None  # unknown name — don't guess; an over-linked graph adds noise
 
     # ------------------------------------------------------------------ #
+    def _adjacency(self) -> "dict[str, set]":
+        """Undirected adjacency, cached (rebuilt lazily after edge/node mutations).
+        Rebuilding this per call was the dominant cost of repeated PPR at scale."""
+        adj = getattr(self, "_adj_cache", None)
+        if adj is None:
+            adj = defaultdict(set)
+            nodes = self.nodes
+            for src, edges in self.out_edges.items():
+                if src not in nodes:
+                    continue
+                for dst, _ in edges:
+                    if dst in nodes:
+                        adj[src].add(dst)
+                        adj[dst].add(src)
+            self._adj_cache = adj
+        return adj
+
     def personalized_pagerank(self, seeds: Iterable[str], alpha: float = 0.85,
-                              iters: int = 30) -> dict[str, float]:
+                              iters: int = 30, max_frontier: int = 2000) -> dict[str, float]:
         """Personalized PageRank over the (undirected) graph, restarting at `seeds`.
 
         Nodes well-connected to the retrieved seeds score high — the Aider-style use
         of the graph: rank the connected subgraph to *select* context, rather than
-        blindly expanding 1-hop neighbors. Pure power iteration (no extra deps)."""
+        blindly expanding 1-hop neighbors. Pure power iteration (no extra deps).
+
+        Sparse + bounded: we propagate only over nonzero nodes and keep the top
+        `max_frontier` each iteration. PPR mass concentrates near the seeds, so this
+        preserves the high-scoring (rankable) nodes while staying fast on a 40k-node
+        graph — without it, repeated per-query PPR is seconds/query."""
         if not self.nodes:
             return {}
-        adj: dict[str, set] = defaultdict(set)
-        for src, edges in self.out_edges.items():
-            for dst, _ in edges:
-                if src in self.nodes and dst in self.nodes:
-                    adj[src].add(dst)
-                    adj[dst].add(src)
+        adj = self._adjacency()
         seeds = [s for s in seeds if s in self.nodes]
         if not seeds:
             return {}
         tele = 1.0 / len(seeds)
-        score = {nid: 0.0 for nid in self.nodes}
-        for s in seeds:
-            score[s] = tele
+        score: dict[str, float] = {s: tele for s in seeds}
         for _ in range(iters):
-            new = {nid: 0.0 for nid in self.nodes}
+            new: dict[str, float] = defaultdict(float)
             for nid, sc in score.items():
                 nbrs = adj.get(nid)
                 if nbrs:
@@ -205,13 +220,16 @@ class CodeGraph:
                         new[m] += share
             for s in seeds:
                 new[s] += (1 - alpha) * tele
+            if len(new) > max_frontier:   # keep the high-mass frontier; the tail can't rank
+                new = dict(sorted(new.items(), key=lambda kv: kv[1], reverse=True)[:max_frontier])
             score = new
-        return score
+        return dict(score)
 
     def _add_edge(self, src: str, dst: str, edge_type: str) -> None:
         if (dst, edge_type) not in self.out_edges[src]:
             self.out_edges[src].append((dst, edge_type))
             self.in_edges[dst].append((src, edge_type))
+            self._adj_cache = None      # invalidate cached adjacency
 
     # Public edit API (used by the graph editor / `graph-edit` CLI).
     def add_edge(self, src: str, dst: str, edge_type: str = EDGE_CALLS) -> None:
@@ -225,6 +243,7 @@ class CodeGraph:
                                if not (d == dst and (edge_type is None or t == edge_type))]
         self.in_edges[dst] = [(s, t) for s, t in self.in_edges.get(dst, [])
                               if not (s == src and (edge_type is None or t == edge_type))]
+        self._adj_cache = None          # invalidate cached adjacency
         return before - len(self.out_edges[src])
 
     def find_ids(self, name: str) -> list[str]:
@@ -282,6 +301,7 @@ class CodeGraph:
             edges[:] = [(d, t) for (d, t) in edges if d not in doomed_set]
         for edges in self.in_edges.values():
             edges[:] = [(s, t) for (s, t) in edges if s not in doomed_set]
+        self._adj_cache = None          # invalidate cached adjacency
 
     def merge(self, other: "CodeGraph") -> None:
         """Merge another graph in (used when re-adding changed files)."""

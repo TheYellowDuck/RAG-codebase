@@ -262,10 +262,19 @@ PageRank order (seeded by the top hits, `Retriever._graph_rerank`, `graph_rerank
 promotes pool members that are call/import-connected to the top candidates. It's the
 **only** lever that moved at-scale recall the right way (+0.025), and it's **neutral on
 small repos** (FastAPI 0.744 → 0.739, n=106) — so it doesn't regress the common case.
-Both effects are within CIs (n=40 / 106), so it ships **opt-in, not default**: a
-measured, conditional, no-cross-encoder mechanism, honestly characterized. The
-candidate-bound ~0.13 (files never retrieved) still needs chunking work — genuinely
-open.
+**Powered up to a significance test, it stays opt-in.** Scaffolding a larger,
+de-confounded Django set (150 paraphrased questions) and running the paired bootstrap:
+baseline recall@5 0.423 → graph_rerank 0.450, **delta +0.027, p=0.075 — not
+significant.** So the effect is *consistent* (+0.025 hand-set, +0.027 scaffolded) and
+*directionally real*, but doesn't clear p<0.05 even at n=150. Honest disposition:
+**opt-in, not default** — a measured, conditional, no-cross-encoder mechanism, the only
+one that moved at-scale recall, but not significant enough to impose on everyone. (Two
+caveats kept the test honest: scaffolded cross-file questions are graph-structured, so
+they *favor* graph_rerank — this is its best case; and the candidate-bound ~0.13 of
+recall, files never retrieved, still needs chunking work.) A perf note from the chase:
+per-query PPR on a 40k-node graph was seconds/query until `personalized_pagerank` was
+made to cache its adjacency and prune the frontier — necessary for graph_rerank to be
+usable at scale at all.
 
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any

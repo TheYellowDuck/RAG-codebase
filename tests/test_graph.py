@@ -129,6 +129,19 @@ def test_personalized_pagerank_favors_connected(make_fileinfo):
     assert ppr[shared] > ppr.get(lonely, 0.0)
 
 
+def test_ppr_adjacency_cache_invalidates_on_edge_change(make_fileinfo):
+    # PPR caches adjacency for speed — adding an edge must invalidate it.
+    pa = chunk_file(make_fileinfo("x.py", "def foo():\n    return 1\n"), "r", "s")
+    pb = chunk_file(make_fileinfo("y.py", "def lonely():\n    return 0\n"), "r", "s")
+    g = CodeGraph.build([pa, pb])
+    foo = next(s.chunk_id for s in pa.symbols if s.simple_name == "foo")
+    lonely = next(s.chunk_id for s in pb.symbols if s.simple_name == "lonely")
+    g.personalized_pagerank([foo])                                  # populate cache
+    assert g.personalized_pagerank([foo]).get(lonely, 0.0) == 0.0   # unconnected
+    g.add_edge(foo, lonely, "calls")
+    assert g.personalized_pagerank([foo]).get(lonely, 0.0) > 0.0    # cache rebuilt
+
+
 def test_cross_file_ambiguous_not_linked(make_fileinfo):
     # Caller has NO local definition and the name is ambiguous across two other
     # files -> resolver must not guess.
