@@ -2,7 +2,7 @@
 
 ![tests](https://img.shields.io/badge/tests-154%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![license](https://img.shields.io/badge/license-MIT-green)
+![license](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green)
 ![providers](https://img.shields.io/badge/LLM-Anthropic%20%7C%20OpenAI--compatible-blueviolet)
 
 A **code-aware retrieval-augmented generation (RAG)** system for asking natural-language
@@ -394,4 +394,5 @@ quotas. Knowing *what's missing and in what order* is the production-readiness s
 
 ### License
 
-[MIT](LICENSE) © George Zhang
+[CC BY-NC 4.0](LICENSE) © George Zhang — free to use, share, and adapt with
+attribution, **non-commercial use only**.
