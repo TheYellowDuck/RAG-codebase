@@ -50,6 +50,8 @@ embed-code = [
 ]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.6",
     "tree-sitter-language-pack>=0.7.0",
 ]
 
@@ -59,6 +61,11 @@ coderag-mcp = "coderag.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["coderag*"]
+
+[tool.ruff.lint]
+# CI gate is real-bug rules (pyflakes + bugbear), not stylistic line length —
+# matches the project's deliberate comment-dense style. Run `ruff check`.
+select = ["F", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

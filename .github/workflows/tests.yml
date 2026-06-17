@@ -23,5 +23,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e . --no-deps
           pip install numpy tree-sitter tree-sitter-python rank-bm25 pathspec pytest tree-sitter-language-pack
+      - name: Lint (real-bug rules — pyflakes + bugbear)
+        run: |
+          pip install ruff
+          ruff check coderag tests scripts
       - name: Run tests
         run: pytest -q
