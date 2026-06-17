@@ -39,7 +39,7 @@ def main() -> int:
                                 "code": d["canonical_solution"]}) + "\n")
             n += 1
     print(f"wrote {n} records -> {OUT}")
-    print("now run: coderag bench %s --suite coderag --mode hybrid -k 10" % OUT)
+    print(f"now run: coderag bench {OUT} --suite coderag --mode hybrid -k 10")
     return 0
 
 

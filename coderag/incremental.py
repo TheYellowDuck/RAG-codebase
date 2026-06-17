@@ -15,7 +15,7 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass, field
 
-from .ingest import FileInfo, discover_files, get_git_sha
+from .ingest import discover_files, get_git_sha
 from .index import CodeIndex
 
 

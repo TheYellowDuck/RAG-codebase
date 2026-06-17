@@ -45,7 +45,7 @@ def paired_bootstrap(a: Sequence[float], b: Sequence[float],
     a, b = list(a), list(b)
     if len(a) != len(b) or not a:
         raise ValueError("paired_bootstrap needs two equal, non-empty score lists")
-    diffs = [x - y for x, y in zip(a, b)]
+    diffs = [x - y for x, y in zip(a, b, strict=True)]
     n = len(diffs)
     rng = random.Random(seed)
     resampled = []

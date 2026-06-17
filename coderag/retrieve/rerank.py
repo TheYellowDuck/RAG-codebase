@@ -9,7 +9,6 @@ Local model by default (cross-encoder/ms-marco-MiniLM-L-6-v2); loaded lazily.
 """
 from __future__ import annotations
 
-from typing import Optional
 
 from ..schema import Chunk
 
@@ -45,5 +44,5 @@ class Reranker:
             return []
         pairs = [(query, c.embed_text) for c in candidates]
         scores = self.model.predict(pairs)
-        ranked = sorted(zip(candidates, scores), key=lambda x: float(x[1]), reverse=True)
+        ranked = sorted(zip(candidates, scores, strict=True), key=lambda x: float(x[1]), reverse=True)
         return [(c, float(s)) for c, s in ranked[:top_k]]

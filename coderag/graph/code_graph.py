@@ -334,7 +334,7 @@ class CodeGraph:
         g = cls()
         if not os.path.isfile(path):
             return g
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         for cid, nd in data.get("nodes", {}).items():
             g.nodes[cid] = GraphNode(**nd)

@@ -99,7 +99,7 @@ class HNSWVectorStore:
         self._index.set_ef(max(self.ef_search, n))   # ef must be >= k
         labels, distances = self._index.knn_query(q, k=n)
         out = []
-        for lbl, dist in zip(labels[0], distances[0]):
+        for lbl, dist in zip(labels[0], distances[0], strict=True):
             cid = self._label_to_id.get(int(lbl))
             if cid is not None:
                 out.append((cid, 1.0 - float(dist)))  # cosine distance -> similarity

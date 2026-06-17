@@ -86,7 +86,12 @@ class Embedder:
 
     @property
     def dim(self) -> int:
-        return int(self.model.get_sentence_embedding_dimension())
+        # get_embedding_dimension() is the current name; fall back for older
+        # sentence-transformers that only have get_sentence_embedding_dimension().
+        m = self.model
+        getter = (getattr(m, "get_embedding_dimension", None)
+                  or m.get_sentence_embedding_dimension)
+        return int(getter())
 
     def encode(self, texts: list[str], batch_size: int = 64,
                show_progress: bool = False, is_query: bool = False) -> np.ndarray:

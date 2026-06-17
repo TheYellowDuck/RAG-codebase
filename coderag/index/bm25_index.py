@@ -29,7 +29,7 @@ class BM25Index:
         return len(self.ids)
 
     def add(self, ids: list[str], texts: list[str]) -> None:
-        for cid, text in zip(ids, texts):
+        for cid, text in zip(ids, texts, strict=True):
             if cid not in self._tokens:
                 self.ids.append(cid)
             self._tokens[cid] = code_tokens(text)
@@ -75,7 +75,7 @@ class BM25Index:
             return []
         qset = set(qtokens)
         scores = self._bm25.get_scores(qtokens)
-        ranked = [(cid, float(s)) for cid, s, docset in zip(self.ids, scores, self._doc_sets)
+        ranked = [(cid, float(s)) for cid, s, docset in zip(self.ids, scores, self._doc_sets, strict=True)
                   if qset & docset]
         ranked.sort(key=lambda x: x[1], reverse=True)
         return ranked[:top_n]

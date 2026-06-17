@@ -132,7 +132,7 @@ def evaluate_coderag_bench(path: Optional[str] = None, *, embedder=None, k: int 
             if reranker is None:
                 from ..retrieve.rerank import Reranker
                 reranker = Reranker(Settings().rerank_model)
-            id_to_doc = dict(zip(ids, docs))
+            id_to_doc = dict(zip(ids, docs, strict=True))
             ranked = []
             for i in range(len(recs)):
                 pool = fused[i][:rerank_pool]

@@ -101,3 +101,26 @@ def test_anthropic_client_passes_resilience_knobs(monkeypatch):
     captured.clear()
     AnthropicClient(LLMConfig())            # unset -> keep SDK defaults (no kwargs)
     assert captured == {}
+
+
+def test_openai_client_passes_resilience_knobs_and_base_url(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    captured = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            captured.update(kw)
+
+    import coderag.llm.deps as deps
+    monkeypatch.setattr(deps, "ensure_sdk",
+                        lambda *a, **k: types.SimpleNamespace(OpenAI=FakeOpenAI))
+    from coderag.llm.openai_client import OpenAIClient
+
+    OpenAIClient(LLMConfig(provider="openai", base_url="http://localhost:11434/v1",
+                           timeout=30.0, max_retries=4))
+    assert captured == {"base_url": "http://localhost:11434/v1",
+                        "timeout": 30.0, "max_retries": 4}
+
+    captured.clear()
+    OpenAIClient(LLMConfig(provider="openai"))   # unset -> SDK defaults, no base_url
+    assert captured == {}

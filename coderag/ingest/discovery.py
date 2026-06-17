@@ -78,7 +78,7 @@ def _load_gitignore(repo_path: str):
     gi = os.path.join(repo_path, ".gitignore")
     if os.path.isfile(gi):
         try:
-            with open(gi, "r", encoding="utf-8", errors="replace") as f:
+            with open(gi, encoding="utf-8", errors="replace") as f:
                 patterns = f.read().splitlines()
         except OSError:
             patterns = []
