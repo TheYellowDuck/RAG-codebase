@@ -132,10 +132,14 @@ The value isn't "it works" — it's *measuring what moves the needle and reporti
 6. **The code graph helps only conditionally** — significant on Go (p=0.019), null on Python.
 7. **Researched the SOTA for the remaining gaps** — Granite embedder and Anthropic Contextual
    Retrieval were measured no-ops here, but a **listwise LLM reranker** significantly lifts
-   recall (+0.086, p<0.001) *and* answer-correctness (0.73 → 0.90).
+   recall (+0.086, p<0.001) *and* answer-correctness (0.73 → 0.90). It **compounds and
+   dominates the embedder choice**: best measured config is `CodeRankEmbed + LLM rerank` =
+   **recall@5 0.858** (+0.156 over the embedder alone, p<0.001), and any decent embedder +
+   the reranker lands in the same range — so the LLM reranker is *the* accuracy lever
+   (enable with `--accurate`).
 
-Lever hierarchy that emerged: **chunking > embedder > BM25 (at scale) > rerank/fusion >
-prompt > graph (conditional) > judge.**
+Lever hierarchy that emerged: **LLM rerank (the lever) > chunking > embedder > BM25 (at
+scale) > fusion > prompt > graph (conditional) > judge.**
 
 ## Skills Demonstrated
 
@@ -288,6 +292,7 @@ python -m coderag.cli query "..." --no-rerank       # skip cross-encoder
 python -m coderag.cli query "..." --expand-graph    # graph neighbors → rerank pool
 python -m coderag.cli query "..." --graph-rerank    # PageRank-connectivity reranking (helps at scale)
 python -m coderag.cli query "..." --llm-rerank      # listwise LLM reranking (+recall, 1 LLM call/query)
+python -m coderag.cli query "..." --accurate        # high-accuracy preset (enables the LLM reranker)
 ```
 
 ### Evaluation

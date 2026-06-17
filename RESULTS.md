@@ -307,6 +307,13 @@ LLM rerankers) and implemented the worthwhile ones. Two didn't transfer; one did
   but a large effect that pushes correctness from *below* the ~0.85 bar to *above* it.
   So the LLM reranker is the single lever that addresses **both** open gaps —
   retrieval recall (significantly) and answer-correctness (strongly, near-significant).
+- **It compounds and dominates the embedder choice (best config measured).** Stacking
+  it on the strongest embedder: CodeRankEmbed alone recall@5 0.703 → **CodeRankEmbed +
+  LLM rerank 0.858** (+0.156, p<0.001, n=106) — the **highest recall@5 of the session.**
+  And `st-codesearch + LLM rerank` (0.830) ≈ `CodeRankEmbed + LLM rerank` (0.858), both
+  far above either embedder alone (~0.70–0.74): once the LLM reranks the pool, the
+  embedder choice matters little. **The LLM reranker is *the* accuracy lever** — it
+  lifts whatever feeds it. Best config = any decent embedder + `--accurate` (LLM rerank).
 
 So the surviving claims: §1 (de-confounding), the **embedder** lever, **BM25 matters
 at scale** (§3b), and **the graph helps on dense/typed graphs** (§3a, cobra). On any
