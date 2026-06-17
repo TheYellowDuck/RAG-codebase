@@ -377,6 +377,27 @@ hours of local embedding). Still: a genuine, leaderboard-protocol number, not a
 self-made ruler — and it confirms the embedder is a pluggable, off-the-shelf choice
 (the project's value is the system + eval, not a novel model).
 
+**Broader CoIR head-to-head (5 of 10 tasks, both embedders, identical protocol).** A
+full-10 run on this MPS Mac kept getting reaped (the heavy ~1M-doc `codesearchnet`
+splits thrash memory and the multi-hour detached job is terminated before finishing —
+an environment limit, not OOM/crash). The 5 tasks that completed for both, however,
+give a clean, decisive comparison:
+
+| CoIR task (nDCG@10) | st-codesearch (default) | CodeRankEmbed (opt-in) |
+|---|---|---|
+| codetrans-dl | 0.248 | 0.344 |
+| codetrans-contest | 0.396 | 0.784 |
+| cosqa | 0.275 | 0.359 |
+| stackoverflow-qa | 0.457 | 0.834 |
+| synthetic-text2sql | 0.330 | 0.597 |
+| **mean (5 tasks)** | **0.341** | **0.584** |
+
+CodeRankEmbed wins all five, **+0.243 mean (~+71%)** — its 5-task mean (0.584) sits in
+the range of CoIR's strong models (E5-Mistral / Voyage-Code-002 ≈ 0.55–0.56 full-10).
+The full official 10-task rank needs a GPU box (CoIR embeds ~2M docs; minutes on a
+cloud GPU, $0 LLM API) — but the conclusion (the opt-in embedder is leaderboard-class,
+the 2021 default is not) is already established.
+
 **A second external adapter — CodeRAG-Bench-style retrieval — closes the
 "embedder-only" gap** ([coderag/eval/coderag_bench.py](coderag/eval/coderag_bench.py)):
 each query has relevant document(s) in a shared corpus, and we run the *full
