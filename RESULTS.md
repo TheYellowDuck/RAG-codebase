@@ -349,6 +349,34 @@ confirmation that the embedder choice (§ above) holds beyond FastAPI/cobra/Djan
 protocol would be marginally harder — directionally the same. This is the *embedder
 alone* — it doesn't exercise BM25/RRF/rerank.)
 
+### 3e. Official CoIR leaderboard protocol (CoSQA) — a real, ranked comparison
+
+The above use convenient protocols; CoIR is the *official* code-IR benchmark. Ran its
+**CoSQA** task (NL web-query → code, the hardest/noisiest of CoIR's 10) through the
+official `coir-eval` harness, wrapping our own `Embedder`, vs the CoIR paper's Table 3
+(nDCG@10):
+
+| Model | CoSQA nDCG@10 |
+|---|---|
+| BM25 | 0.140 |
+| UniXcoder | 0.251 |
+| **st-codesearch (our default, 2021)** | **0.275** |
+| OpenAI text-embedding-ada-002 | 0.289 |
+| Voyage-Code-002 | 0.298 |
+| E5-Mistral-7B | 0.313 |
+| E5-Base | 0.326 |
+| **CodeRankEmbed (our opt-in)** | **0.359** |
+
+Honest placement: our **default** lands mid-pack (above UniXcoder, below the commercial
+embedders) — it's a 2021 model. Our **opt-in CodeRankEmbed beats every baseline in the
+CoIR paper on this task** (E5-Base, E5-Mistral-7B, Voyage-Code-002, ada-002). Caveats:
+(1) CodeRankEmbed postdates the paper, and current overall CoIR *leaders* (Gemini
+Embedding 2, Qwen3-Embedding, SFR/CodeXEmbed, Voyage-code-3) score higher; (2) this is
+**1 of CoIR's 10 datasets** — a full rank needs all of them (`coir-eval`, ~$0 API but
+hours of local embedding). Still: a genuine, leaderboard-protocol number, not a
+self-made ruler — and it confirms the embedder is a pluggable, off-the-shelf choice
+(the project's value is the system + eval, not a novel model).
+
 **A second external adapter — CodeRAG-Bench-style retrieval — closes the
 "embedder-only" gap** ([coderag/eval/coderag_bench.py](coderag/eval/coderag_bench.py)):
 each query has relevant document(s) in a shared corpus, and we run the *full

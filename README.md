@@ -109,6 +109,7 @@ graph LR
 | Embedder lever (golden set, recall@5) | general 0.83 → code-trained **0.97** (CIs disjoint) |
 | External — CodeSearchNet (800 docstring→code) | recall@10 **0.985** · MRR 0.948 |
 | External — HumanEval (164 problem→solution) | hybrid recall@10 **0.860** · MRR 0.543 |
+| **Official CoIR leaderboard (CoSQA)** | CodeRankEmbed nDCG@10 **0.359** — beats E5-Base 0.326, Voyage-Code-002 0.298, ada-002 0.289 (CoIR paper Table 3); default 0.275 |
 | Scale — Django (521k LOC, ~40k chunks) | indexes in 84 s; BM25 adds **+0.10** recall@5 (significant) |
 | Faithfulness (accurately judged) | **~0.95** |
 | Test suite | **158 passing** |

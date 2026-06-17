@@ -35,9 +35,10 @@ openai = [
 mcp = [
     "mcp>=1.2",
 ]
-# External benchmark: stream CodeSearchNet for the retrieval validity check.
+# External benchmarks: CodeSearchNet/HumanEval streaming + the official CoIR harness.
 bench = [
     "datasets>=2.0",
+    "coir-eval>=0.1",
 ]
 # Approximate vector backend (HNSW) for large indexes: CODERAG_VECTOR_BACKEND=hnsw.
 ann = [
