@@ -15,9 +15,10 @@
 
 SKIP_HEAVY = False   # True -> skip codesearchnet / -ccr (the ~1M-doc tasks); 8-task run
 
-import subprocess, sys, gc
+import subprocess, sys, gc, shutil
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                 "coir-eval", "sentence-transformers", "einops"], check=True)
+shutil.rmtree("/tmp/coir", ignore_errors=True)   # clear any cached results from a prior run
 
 import coir
 from statistics import mean
@@ -47,15 +48,16 @@ if not SKIP_HEAVY:
     TASKS += ["codesearchnet", "codesearchnet-ccr"]   # each expands into 6 languages
 
 
-def score_task(model, task):
+def score_task(model, task, model_id):
     """Run a task one (per-language) split at a time, freeing memory between splits,
-    so peak RAM stays ~one corpus + one embedding matrix — not all 6 at once."""
+    so peak RAM stays ~one corpus + one embedding matrix — not all 6 at once.
+    output_folder is per-MODEL so the 2nd embedder doesn't hit the 1st's cache."""
     data = coir.get_tasks(tasks=[task])          # codesearchnet -> 6 sub-tasks
     subnames = list(data.keys())
     sub_scores = []
     for sub in subnames:
         ev = coir.COIR(tasks={sub: data[sub]}, batch_size=64)
-        res = ev.run(model, output_folder=f"/tmp/coir/{sub}")
+        res = ev.run(model, output_folder=f"/tmp/coir/{model_id}/{sub}")
         sub_scores.append(res[sub]["NDCG"]["NDCG@10"])
         data[sub] = None                          # free this split's corpus
         del ev, res
@@ -70,10 +72,11 @@ for label, name, qprefix, trust in [
      "nomic-ai/CodeRankEmbed", "Represent this query for searching relevant code: ", True),
 ]:
     model = Model(name, qprefix, trust)
+    model_id = name.split("/")[-1]
     per_task = []
     for t in TASKS:
         try:
-            s = score_task(model, t)
+            s = score_task(model, t, model_id)
             per_task.append(s)
             print(f"  {label:26} {t:20} nDCG@10={s:.4f}", flush=True)
         except Exception as e:
