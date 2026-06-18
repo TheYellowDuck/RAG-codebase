@@ -20,16 +20,19 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                 "coir-eval", "sentence-transformers", "einops"], check=True)
 shutil.rmtree("/tmp/coir", ignore_errors=True)   # clear any cached results from a prior run
 
-import coir
+import coir, torch
 from statistics import mean
 from sentence_transformers import SentenceTransformer
 
 
 class Model:
     """CoIR model interface = a sentence-transformers model + the query prefix the
-    embedder needs (mirrors coderag.embed.Embedder)."""
-    def __init__(self, name, query_prefix="", trust=False):
+    embedder needs (mirrors coderag.embed.Embedder). `max_seq_len` caps long-context
+    models (CodeRankEmbed's 8192 ctx makes attention O(seq^2) blow up GPU VRAM)."""
+    def __init__(self, name, query_prefix="", trust=False, max_seq_len=None):
         self.m = SentenceTransformer(name, trust_remote_code=trust)
+        if max_seq_len:
+            self.m.max_seq_length = max_seq_len
         self.qp = query_prefix
 
     def encode_queries(self, queries, batch_size=64, **kw):
@@ -62,16 +65,18 @@ def score_task(model, task, model_id):
         data[sub] = None                          # free this split's corpus
         del ev, res
         gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()              # free GPU VRAM between splits
     return mean(sub_scores)
 
 
-for label, name, qprefix, trust in [
+for label, name, qprefix, trust, max_seq_len in [
     ("st-codesearch (default)",
-     "flax-sentence-embeddings/st-codesearch-distilroberta-base", "", False),
+     "flax-sentence-embeddings/st-codesearch-distilroberta-base", "", False, None),
     ("CodeRankEmbed (opt-in)",
-     "nomic-ai/CodeRankEmbed", "Represent this query for searching relevant code: ", True),
+     "nomic-ai/CodeRankEmbed", "Represent this query for searching relevant code: ", True, 512),
 ]:
-    model = Model(name, qprefix, trust)
+    model = Model(name, qprefix, trust, max_seq_len)
     model_id = name.split("/")[-1]
     per_task = []
     for t in TASKS:
