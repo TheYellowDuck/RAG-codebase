@@ -349,54 +349,52 @@ confirmation that the embedder choice (§ above) holds beyond FastAPI/cobra/Djan
 protocol would be marginally harder — directionally the same. This is the *embedder
 alone* — it doesn't exercise BM25/RRF/rerank.)
 
-### 3e. Official CoIR leaderboard protocol (CoSQA) — a real, ranked comparison
+### 3e. Official CoIR leaderboard — the full 10-task ranked comparison
 
-The above use convenient protocols; CoIR is the *official* code-IR benchmark. Ran its
-**CoSQA** task (NL web-query → code, the hardest/noisiest of CoIR's 10) through the
-official `coir-eval` harness, wrapping our own `Embedder`, vs the CoIR paper's Table 3
-(nDCG@10):
-
-| Model | CoSQA nDCG@10 |
-|---|---|
-| BM25 | 0.140 |
-| UniXcoder | 0.251 |
-| **st-codesearch (our default, 2021)** | **0.275** |
-| OpenAI text-embedding-ada-002 | 0.289 |
-| Voyage-Code-002 | 0.298 |
-| E5-Mistral-7B | 0.313 |
-| E5-Base | 0.326 |
-| **CodeRankEmbed (our opt-in)** | **0.359** |
-
-Honest placement: our **default** lands mid-pack (above UniXcoder, below the commercial
-embedders) — it's a 2021 model. Our **opt-in CodeRankEmbed beats every baseline in the
-CoIR paper on this task** (E5-Base, E5-Mistral-7B, Voyage-Code-002, ada-002). Caveats:
-(1) CodeRankEmbed postdates the paper, and current overall CoIR *leaders* (Gemini
-Embedding 2, Qwen3-Embedding, SFR/CodeXEmbed, Voyage-code-3) score higher; (2) this is
-**1 of CoIR's 10 datasets** — a full rank needs all of them (`coir-eval`, ~$0 API but
-hours of local embedding). Still: a genuine, leaderboard-protocol number, not a
-self-made ruler — and it confirms the embedder is a pluggable, off-the-shelf choice
-(the project's value is the system + eval, not a novel model).
-
-**Broader CoIR head-to-head (5 of 10 tasks, both embedders, identical protocol).** A
-full-10 run on this MPS Mac kept getting reaped (the heavy ~1M-doc `codesearchnet`
-splits thrash memory and the multi-hour detached job is terminated before finishing —
-an environment limit, not OOM/crash). The 5 tasks that completed for both, however,
-give a clean, decisive comparison:
+CoIR (ACL 2025) is the *official* code-IR benchmark: 10 datasets, 8 task types, ~2M
+documents. Ran the **complete suite** through the official `coir-eval` harness (free
+Kaggle GPU, ~10 h, **$0 LLM API**), wrapping each of our embedders. Official mean
+nDCG@10, all 10 tasks ([scripts/coir_colab.py](scripts/coir_colab.py) reproduces it):
 
 | CoIR task (nDCG@10) | st-codesearch (default) | CodeRankEmbed (opt-in) |
 |---|---|---|
 | codetrans-dl | 0.248 | 0.344 |
 | codetrans-contest | 0.396 | 0.784 |
-| cosqa | 0.275 | 0.359 |
+| cosqa | 0.286 | 0.368 |
 | stackoverflow-qa | 0.457 | 0.834 |
-| synthetic-text2sql | 0.330 | 0.597 |
-| **mean (5 tasks)** | **0.341** | **0.584** |
+| synthetic-text2sql | 0.356 | 0.636 |
+| codefeedback-st | 0.384 | 0.780 |
+| codefeedback-mt | 0.166 | 0.490 |
+| apps | 0.027 | 0.237 |
+| codesearchnet | 0.727 | 0.832 |
+| codesearchnet-ccr | 0.725 | 0.887 |
+| **CoIR-10 mean** | **0.377** | **0.619** |
 
-CodeRankEmbed wins all five, **+0.243 mean (~+71%)** — its 5-task mean (0.584) sits in
-the range of CoIR's strong models (E5-Mistral / Voyage-Code-002 ≈ 0.55–0.56 full-10).
-The full official 10-task rank needs a GPU box (CoIR embeds ~2M docs; minutes on a
-cloud GPU, $0 LLM API) — but the conclusion (the opt-in embedder is leaderboard-class,
-the 2021 default is not) is already established.
+Against the CoIR paper's reported overall means:
+
+| Model | CoIR-10 mean nDCG@10 |
+|---|---|
+| **st-codesearch (our default, 2021)** | **0.377** |
+| E5-Mistral-7B | 0.552 |
+| Voyage-Code-002 (paper's best) | 0.563 |
+| **CodeRankEmbed (our opt-in)** | **0.619** |
+
+Honest placement:
+- **Our opt-in (CodeRankEmbed, 0.619) beats the CoIR paper's top two** — Voyage-Code-002
+  (0.563) and E5-Mistral-7B (0.552) — over the full 10 tasks, and wins **all 10** vs our
+  default. A 137M code-specialized embedder outranking a 7B model and a commercial API is
+  a real, leaderboard-protocol result (it even wins the hard CoSQA task, 0.368, over the
+  paper's CoSQA baselines E5-Base 0.326 / Voyage-Code-002 0.298).
+- **Our default (st-codesearch, 0.377) is below the field** — a 2021 model; strong only on
+  the codesearchnet tasks it was trained for (~0.73), weak elsewhere (apps 0.027).
+- **Caveats:** CodeRankEmbed postdates the paper, so *current* CoIR leaders (Gemini-
+  Embedding-2, Qwen3-Embedding, SFR/CodeXEmbed, Voyage-code-3) report higher still — this
+  is "beats the paper's baselines," not absolute SOTA. Run capped at 512 tokens (how we
+  use it).
+
+This nails the project's framing: the embedder is a **pluggable, off-the-shelf
+component** — drop in a strong code embedder and the retrieval layer is leaderboard-class;
+the project's own value is the **system + the honest evaluation**, not a novel model.
 
 **A second external adapter — CodeRAG-Bench-style retrieval — closes the
 "embedder-only" gap** ([coderag/eval/coderag_bench.py](coderag/eval/coderag_bench.py)):
