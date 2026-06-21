@@ -8,6 +8,14 @@ from coderag.ingest.discovery import FileInfo
 from coderag.tokenization import code_tokens
 
 
+def stable_hash(tok: str) -> int:
+    """Process-independent token hash. Python's builtin hash() is randomized per
+    run (PYTHONHASHSEED), so using it for the dimension mapping made the stub
+    embedder non-deterministic — occasional ranking ties flipped and flaked CI.
+    A fixed digest keeps the embedder actually deterministic, as promised."""
+    return int.from_bytes(hashlib.blake2b(tok.encode("utf-8"), digest_size=8).digest(), "big")
+
+
 class StubEmbedder:
     """Deterministic bag-of-code-tokens hashing embedder — no torch, no network.
 
@@ -21,7 +29,7 @@ class StubEmbedder:
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for i, t in enumerate(texts):
             for tok in code_tokens(t):
-                out[i, hash(tok) % self.dim] += 1.0
+                out[i, stable_hash(tok) % self.dim] += 1.0
             n = np.linalg.norm(out[i])
             if n:
                 out[i] /= n

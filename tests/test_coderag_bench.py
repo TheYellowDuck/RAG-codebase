@@ -11,17 +11,22 @@ import numpy as np
 
 from coderag.eval.coderag_bench import evaluate_coderag_bench, load_coderag_bench
 
+from conftest import stable_hash
+
 
 class HashEmbedder:
     """Deterministic bag-of-words hashing embedder — enough for cosine to be
-    meaningful (queries near docs that share tokens) without any model download."""
+    meaningful (queries near docs that share tokens) without any model download.
+
+    Uses a stable digest (not builtin hash(), which is PYTHONHASHSEED-randomized)
+    so the token->dimension mapping — and thus ranking order — is reproducible."""
     dim = 64
 
     def encode(self, texts, **kw):
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for i, t in enumerate(texts):
             for tok in re.findall(r"\w+", t.lower()):
-                out[i, hash(tok) % self.dim] += 1.0
+                out[i, stable_hash(tok) % self.dim] += 1.0
             nrm = np.linalg.norm(out[i])
             if nrm:
                 out[i] /= nrm
