@@ -23,8 +23,11 @@ dependencies = [
 # Unlocks AST chunking for ~all languages (~165 tree-sitter grammars in one
 # install). Python works without it; JS/TS work with it OR with their own
 # dedicated grammar packages. Without it, unlisted languages window-chunk.
+# Capped <1.9: the 1.9 release is a native rewrite whose get_language() no longer
+# returns a tree_sitter.Language, so it can't drive our standalone tree-sitter
+# Parser (the loader degrades + warns, but <1.9 keeps full AST coverage).
 langs = [
-    "tree-sitter-language-pack>=0.7.0",
+    "tree-sitter-language-pack>=0.7.0,<1.9",
 ]
 # Use OpenAI or any OpenAI-compatible endpoint (OpenRouter, Together, Groq,
 # Ollama, LM Studio, vLLM, Azure) as the generation/judging provider.
@@ -53,7 +56,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.6",
-    "tree-sitter-language-pack>=0.7.0",
+    "tree-sitter-language-pack>=0.7.0,<1.9",
 ]
 
 [project.scripts]

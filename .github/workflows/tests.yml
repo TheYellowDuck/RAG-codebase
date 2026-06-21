@@ -22,7 +22,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e . --no-deps
-          pip install numpy tree-sitter tree-sitter-python rank-bm25 pathspec pytest tree-sitter-language-pack
+          # Pin tree-sitter-language-pack <1.9: the 1.9 native rewrite returns a
+          # non-tree_sitter.Language from get_language(), breaking AST chunking for
+          # pack-only languages (Go/Ruby/...). See coderag/ingest/languages.py.
+          pip install numpy tree-sitter tree-sitter-python rank-bm25 pathspec pytest 'tree-sitter-language-pack<1.9'
       - name: Lint (real-bug rules — pyflakes + bugbear)
         run: |
           pip install ruff

@@ -20,6 +20,7 @@ thing you confirm by parsing a sample and reading the AST.
 """
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from typing import Optional
 
@@ -276,6 +277,26 @@ def is_precise(language: str) -> bool:
 # Parsers are cached per language; None means "no grammar available" → fallback.
 _PARSERS: dict[str, object] = {}
 
+# Set once if an installed tree-sitter-language-pack is too new to use with our
+# standalone tree-sitter core (the 1.9 rewrite — see _load_pack), so we warn the
+# user exactly once instead of silently window-chunking every pack-only language.
+_PACK_INCOMPAT_WARNED = False
+
+
+def _warn_pack_incompatible() -> None:
+    global _PACK_INCOMPAT_WARNED
+    if _PACK_INCOMPAT_WARNED:
+        return
+    _PACK_INCOMPAT_WARNED = True
+    print(
+        "[grammars] installed tree-sitter-language-pack is incompatible with this "
+        "project's tree-sitter core (its get_language() no longer returns a "
+        "tree_sitter.Language — the 1.9+ native rewrite). Pack-only languages will "
+        "line-window-chunk instead of AST-chunk. Pin 'tree-sitter-language-pack<1.9' "
+        "to restore full AST coverage.",
+        file=sys.stderr,
+    )
+
 
 def _build_parser(language_obj):
     from tree_sitter import Parser
@@ -312,12 +333,29 @@ def _load_dedicated(language: str):
 def _load_pack(language: str):
     # Use get_language (returns a real tree_sitter.Language) and build the parser
     # with OUR installed tree-sitter, so every grammar yields the same Node API.
-    # (The pack's own get_parser returns a parser bound to a vendored, ABI-
-    # incompatible core whose Node API differs — avoid it.)
+    # (The pack's own get_parser returns a parser bound to a vendored core whose
+    # Node/Parser API differs — avoid it.)
+    #
+    # The pack's 1.9 release is a full native rewrite: get_language() now returns
+    # the pack's own `_native.Language`, NOT a tree_sitter.Language, so our Parser
+    # can't consume it. Gate on the installed-core type so an incompatible pack
+    # degrades to window chunking with a clear, one-time warning instead of every
+    # pack-only language silently failing to AST-chunk (pin the pack <1.9 to fix).
     try:
+        from tree_sitter import Language as _TSLanguage
         from tree_sitter_language_pack import get_language as pack_get_language
-        name = _PACK_ALIAS.get(language, language)
-        return _build_parser(pack_get_language(name))
+    except Exception:
+        return None
+    name = _PACK_ALIAS.get(language, language)
+    try:
+        lang_obj = pack_get_language(name)
+    except Exception:
+        return None
+    if not isinstance(lang_obj, _TSLanguage):
+        _warn_pack_incompatible()
+        return None
+    try:
+        return _build_parser(lang_obj)
     except Exception:
         return None
 

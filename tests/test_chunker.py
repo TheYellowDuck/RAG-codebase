@@ -135,7 +135,11 @@ def test_generic_chunker_on_python_grammar(make_fileinfo):
 
 
 def test_go_generic_chunking_if_pack_available(make_fileinfo):
-    pytest.importorskip("tree_sitter_language_pack")
+    # Skip only if NO Go grammar resolves (consistent with how chunk_file picks a
+    # grammar) — e.g. with an incompatible tree-sitter-language-pack>=1.9 installed.
+    from coderag.ingest.languages import get_parser
+    if get_parser("go") is None:
+        pytest.skip("no Go grammar available (pin tree-sitter-language-pack<1.9)")
     src = (
         'package main\n\nimport "fmt"\n\n'
         'func Hello() string {\n  return greet()\n}\n\n'
@@ -150,7 +154,9 @@ def test_go_generic_chunking_if_pack_available(make_fileinfo):
 
 
 def test_ruby_generic_chunking_if_pack_available(make_fileinfo):
-    pytest.importorskip("tree_sitter_language_pack")
+    from coderag.ingest.languages import get_parser
+    if get_parser("ruby") is None:
+        pytest.skip("no Ruby grammar available (pin tree-sitter-language-pack<1.9)")
     src = (
         "class Widget\n  def run(x)\n    scale(x)\n  end\n\n"
         "  def scale(x)\n    x * 2\n  end\nend\n"
