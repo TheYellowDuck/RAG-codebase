@@ -1,12 +1,15 @@
-# Generation (Claude)
-anthropic>=0.40.0
+# Generation (Claude). Upper-capped: the 0.x SDK has a history of breaking changes,
+# and the client uses recent message-API shapes (output_config / adaptive thinking).
+anthropic>=0.40.0,<1.0
 
 # Local embeddings + cross-encoder reranking (the default stack).
 # Pulls in torch + transformers on first install.
 sentence-transformers>=2.7.0
 
-# Code-aware chunking
-tree-sitter>=0.21.0
+# Code-aware chunking. tree-sitter core is upper-capped because grammar wheels are
+# compiled against a specific core ABI (the 0.21->0.22 Parser change already needed
+# a shim); tree-sitter-python stays uncapped so pip co-resolves a matching grammar.
+tree-sitter>=0.21.0,<0.26
 tree-sitter-python>=0.21.0
 
 # Lexical retrieval
@@ -15,14 +18,15 @@ rank-bm25>=0.2.2
 # .gitignore-aware file discovery
 pathspec>=0.12.0
 
-# Numerics (also a transitive dep of sentence-transformers)
-numpy>=1.24.0
+# Numerics (also a transitive dep of sentence-transformers). Capped <3 to avoid a
+# future numpy ABI break (cf. 2.0) resolving against older compiled torch/ST wheels.
+numpy>=1.24.0,<3
 
 # --- Optional ---------------------------------------------------------------
 # AST-chunk ~all languages (~165 tree-sitter grammars in one install). Python is
 # AST-chunked without it; other languages fall back to line-window chunking until
 # it's installed. Enable with:  pip install 'coderag[langs]'  (or uncomment):
-# tree-sitter-language-pack>=0.7.0
+# tree-sitter-language-pack>=0.7.0,<1.9    # 1.9 is a breaking native rewrite
 #
 # Test suite:  pip install 'coderag[dev]'  (or:  pip install pytest)
 # pytest>=7.0

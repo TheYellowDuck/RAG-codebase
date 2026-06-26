@@ -28,7 +28,7 @@ class OpenAIClient(LLMClient):
                 "works), and optionally CODERAG_LLM_BASE_URL for a custom endpoint."
             )
         from .deps import ensure_sdk
-        openai = ensure_sdk("openai", "openai")
+        openai = ensure_sdk("openai", "openai>=1.0,<2")
         kwargs = {}
         if config.base_url:
             kwargs["base_url"] = config.base_url

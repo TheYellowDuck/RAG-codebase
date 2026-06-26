@@ -34,7 +34,7 @@ class AnthropicClient(LLMClient):
                 "CODERAG_LLM_PROVIDER=openai."
             )
         from .deps import ensure_sdk
-        anthropic = ensure_sdk("anthropic", "anthropic")
+        anthropic = ensure_sdk("anthropic", "anthropic>=0.40.0,<1.0")
         # The SDK implements exponential backoff; we just bound it (defaults kept
         # when the env knobs are unset). See coderag/resilience.py.
         opts = {k: v for k, v in (("timeout", config.timeout),

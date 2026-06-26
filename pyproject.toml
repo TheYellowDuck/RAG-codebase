@@ -10,13 +10,16 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
-    "anthropic>=0.40.0",
+    # Upper caps are defensive against ABI/API breaks (see requirements.txt): the
+    # anthropic 0.x SDK churns its message API, and numpy/tree-sitter are ABI-coupled
+    # to compiled wheels (torch/ST; grammar packages). tree-sitter-python stays open.
+    "anthropic>=0.40.0,<1.0",
     "sentence-transformers>=2.7.0",
-    "tree-sitter>=0.21.0",
+    "tree-sitter>=0.21.0,<0.26",
     "tree-sitter-python>=0.21.0",
     "rank-bm25>=0.2.2",
     "pathspec>=0.12.0",
-    "numpy>=1.24.0",
+    "numpy>=1.24.0,<3",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +35,7 @@ langs = [
 # Use OpenAI or any OpenAI-compatible endpoint (OpenRouter, Together, Groq,
 # Ollama, LM Studio, vLLM, Azure) as the generation/judging provider.
 openai = [
-    "openai>=1.0",
+    "openai>=1.0,<2",
 ]
 # Expose the RAG as an MCP server (coderag.mcp_server) for agents/IDEs.
 mcp = [
