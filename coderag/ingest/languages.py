@@ -298,6 +298,22 @@ def _warn_pack_incompatible() -> None:
     )
 
 
+# Languages whose grammar was installed but failed to build a parser (warn once
+# each — distinct from a grammar simply being absent, which is a silent, expected
+# fallback to window chunking).
+_GRAMMAR_LOAD_WARNED: set[str] = set()
+
+
+def _warn_grammar_load_failed(language: str, exc: Exception) -> None:
+    if language in _GRAMMAR_LOAD_WARNED:
+        return
+    _GRAMMAR_LOAD_WARNED.add(language)
+    print(f"[grammars] {language}: a grammar is installed but failed to load "
+          f"({type(exc).__name__}: {exc}); falling back to line-window chunking. "
+          f"This is a real load error, not a missing grammar.",
+          file=sys.stderr)
+
+
 def _build_parser(language_obj):
     from tree_sitter import Parser
     try:
@@ -326,7 +342,10 @@ def _load_dedicated(language: str):
         except TypeError:
             lang_obj = Language(capsule, language)
         return _build_parser(lang_obj)
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
+        return None                              # grammar package absent → silent
+    except Exception as e:
+        _warn_grammar_load_failed(language, e)   # present but broke → warn once
         return None
 
 
@@ -356,7 +375,10 @@ def _load_pack(language: str):
         return None
     try:
         return _build_parser(lang_obj)
-    except Exception:
+    except Exception as e:
+        # The pack is present and returned a valid Language, so this is a genuine
+        # build failure, not a missing grammar — surface it.
+        _warn_grammar_load_failed(language, e)
         return None
 
 
@@ -371,7 +393,10 @@ def _load_module(language: str):
         except TypeError:
             lang_obj = Language(capsule, language)
         return _build_parser(lang_obj)
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
+        return None                              # tree_sitter_<lang> absent → silent
+    except Exception as e:
+        _warn_grammar_load_failed(language, e)   # present but broke → warn once
         return None
 
 
@@ -389,3 +414,4 @@ def reset_parser_cache() -> None:
     """Forget cached parsers (incl. cached failures) so get_parser retries — call
     after installing a grammar at runtime."""
     _PARSERS.clear()
+    _GRAMMAR_LOAD_WARNED.clear()
