@@ -24,6 +24,11 @@ T = TypeVar("T")
 
 _LEVEL = os.environ.get("CODERAG_LOG_LEVEL", "WARNING").upper()
 
+# Backoff jitter uses a module-local RNG so it can't perturb (or be perturbed by)
+# the global random state any other code or test relies on. Not seeded — jitter
+# is meant to be random, just isolated.
+_JITTER_RNG = random.Random()
+
 
 def get_logger(name: str = "coderag") -> logging.Logger:
     log = logging.getLogger(name)
@@ -73,7 +78,7 @@ def with_retry(fn: Callable[[], T], *, attempts: int = 3, base_delay: float = 0.
         except BaseException as e:  # noqa: BLE001 - we re-raise unless transient
             if attempt >= attempts or not transient(e):
                 raise
-            delay = min(max_delay, base_delay * 2 ** (attempt - 1)) * (1 + random.random())
+            delay = min(max_delay, base_delay * 2 ** (attempt - 1)) * (1 + _JITTER_RNG.random())
             _log.warning("%s failed (attempt %d/%d): %s: %s — retrying in %.2fs",
                          desc, attempt, attempts, type(e).__name__, e, delay)
             time.sleep(delay)

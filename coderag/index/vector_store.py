@@ -41,7 +41,6 @@ class VectorStore:
     def __init__(self, dim: Optional[int] = None):
         self.dim = dim
         self.ids: list[str] = []
-        self._id_to_row: dict[str, int] = {}
         self._matrix: Optional[np.ndarray] = None  # (N, D) float32
 
     def __len__(self) -> int:
@@ -57,9 +56,7 @@ class VectorStore:
             self._matrix = vectors.copy()
         else:
             self._matrix = np.vstack([self._matrix, vectors])
-        for cid in ids:
-            self._id_to_row[cid] = len(self.ids)
-            self.ids.append(cid)
+        self.ids.extend(ids)
 
     def remove(self, ids: set[str]) -> None:
         """Drop chunks by id (incremental reindex). Rebuilds the matrix — fine
@@ -69,7 +66,6 @@ class VectorStore:
         keep = [i for i, cid in enumerate(self.ids) if cid not in ids]
         self._matrix = self._matrix[keep] if keep else None
         self.ids = [self.ids[i] for i in keep]
-        self._id_to_row = {cid: i for i, cid in enumerate(self.ids)}
 
     def search(self, query_vec: np.ndarray, top_n: int) -> list[tuple[str, float]]:
         """Return up to top_n (chunk_id, cosine_score), best first."""
@@ -78,9 +74,12 @@ class VectorStore:
         q = np.asarray(query_vec, dtype=np.float32).reshape(-1)
         scores = self._matrix @ q  # cosine, since both sides are normalized
         n = min(top_n, len(self.ids))
-        # argpartition for the top-n, then sort just those.
-        idx = np.argpartition(-scores, n - 1)[:n]
-        idx = idx[np.argsort(-scores[idx])]
+        # Stable sort so equal-cosine ties (duplicated/near-identical code, exact
+        # 1.0 matches) resolve by row/insertion order — deterministic across runs
+        # and NumPy versions, for both membership AND order. (argpartition + a
+        # non-stable argsort left the tie order — and which tied chunk made the
+        # cut — undefined, which propagates through RRF/rerank into final results.)
+        idx = np.argsort(-scores, kind="stable")[:n]
         return [(self.ids[i], float(scores[i])) for i in idx]
 
     # --- persistence ------------------------------------------------------
@@ -101,7 +100,6 @@ class VectorStore:
                 meta = json.load(f)
             store.ids = meta["ids"]
             store.dim = meta.get("dim")
-            store._id_to_row = {cid: i for i, cid in enumerate(store.ids)}
         if os.path.isfile(vec_path):
             store._matrix = np.load(vec_path)
         return store

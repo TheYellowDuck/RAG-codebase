@@ -28,7 +28,7 @@ def test_build_questions_excludes_used_symbols(sample_repo, embedder):
     all_syms = {s for q in build_questions(idx, n=50, holdout_every=0)
                 for s in q["relevant_symbols"]}
     # excluding a symbol must drop every question that references it
-    pick = next(iter(all_syms))
+    pick = sorted(all_syms)[0]   # deterministic (no set-iteration-order reliance)
     qs = build_questions(idx, n=50, exclude_symbols={pick}, holdout_every=0)
     assert all(pick not in q["relevant_symbols"] for q in qs)
 

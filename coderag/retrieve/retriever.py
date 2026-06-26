@@ -44,6 +44,9 @@ def rrf(*ranked_lists: list[str], k: int = 60,
     best first. Fuse by rank — cosine and BM25 scores aren't comparable, so don't
     normalize them; RRF is parameter-light and beats either retriever alone.
     `weights` (per list) lets you up/down-weight dense vs lexical (default equal)."""
+    if weights is not None and len(weights) != len(ranked_lists):
+        raise ValueError(
+            f"rrf: {len(weights)} weights for {len(ranked_lists)} ranked lists")
     scores: dict[str, float] = defaultdict(float)
     for i, ranked in enumerate(ranked_lists):
         w = weights[i] if weights else 1.0
