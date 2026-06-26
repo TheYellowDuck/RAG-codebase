@@ -21,7 +21,7 @@ from ..config import Settings
 from ..schema import Chunk
 from ..index import CodeIndex
 from ..embed import Embedder
-from ..tokenization import code_tokens
+from ..tokenization import code_tokens, token_len
 from .rerank import Reranker
 
 
@@ -50,6 +50,28 @@ def rrf(*ranked_lists: list[str], k: int = 60,
         for rank, cid in enumerate(ranked, start=1):
             scores[cid] += w / (k + rank)
     return sorted(scores, key=scores.get, reverse=True)
+
+
+def _rerank_snippet(c: Chunk, max_tokens: int = 400) -> str:
+    """Candidate text for the listwise LLM reranker: the context header (file /
+    class / signature) plus as much of the body as fits a per-candidate token
+    budget. The old 240-char cut showed the ranker ~6 lines and hid the rest of
+    every function — the same blind-judge failure mode as the §4 faithfulness
+    truncation (0.79->0.95 once sources weren't cut)."""
+    # getattr-defensive: _llm_rerank fails open on any exception, so a raise here
+    # would silently drop the rerank rather than surface a bug.
+    header = (getattr(c, "context_header", "") or "").strip()
+    body = getattr(c, "code", "") or ""
+    snippet = (f"{header}\n{body}" if header else body).strip()
+    if token_len(snippet) <= max_tokens:
+        return snippet
+    # Over budget: always keep the header, then a leading slice of the body sized
+    # to the remaining budget (~4 chars/token), trimmed back to a whole line.
+    budget_chars = max(0, (max_tokens - token_len(header)) * 4)
+    sliced = body[:budget_chars]
+    if "\n" in sliced:
+        sliced = sliced.rsplit("\n", 1)[0]
+    return (f"{header}\n{sliced}\n…" if header else f"{sliced}\n…").strip()
 
 
 class Retriever:
@@ -159,7 +181,7 @@ class Retriever:
                 from ..llm import get_llm_client
                 self._llm = get_llm_client()
             items = "\n\n".join(
-                f"{i + 1}. {c.file_path}:{c.start_line}\n{(c.code or '')[:240]}"
+                f"{i + 1}. {c.file_path}:{c.start_line}\n{_rerank_snippet(c)}"
                 for i, c in enumerate(cand))
             txt = self._llm.generate(
                 "You rank code-search candidates by relevance to the query.",
