@@ -42,6 +42,8 @@ class RunConfig:
     use_bm25: bool = True
     use_rerank: bool = True
     expand_graph: bool = False
+    llm_rerank: bool = False
+    graph_rerank: bool = False
 
 
 # Ablation ladder runnable on a single index (mirrors outline §6.4's table shape).
@@ -51,6 +53,12 @@ DEFAULT_CONFIGS: dict[str, RunConfig] = {
     "rerank": RunConfig("rerank", use_dense=True, use_bm25=True, use_rerank=True),
     "graph": RunConfig("graph", use_dense=True, use_bm25=True, use_rerank=True,
                        expand_graph=True),
+    # The validated accuracy lever + the graph-rerank lever — previously not
+    # reachable from the eval harness (only the CLI exposed them).
+    "llm-rerank": RunConfig("llm-rerank", use_dense=True, use_bm25=True,
+                            use_rerank=False, llm_rerank=True),
+    "graph-rerank": RunConfig("graph-rerank", use_dense=True, use_bm25=True,
+                              use_rerank=False, graph_rerank=True),
 }
 
 
@@ -92,6 +100,7 @@ def run_config(retriever: Retriever, settings: Settings,
             q.question, k=retrieve_k,
             use_dense=config.use_dense, use_bm25=config.use_bm25,
             use_rerank=config.use_rerank, expand_graph=config.expand_graph,
+            llm_rerank=config.llm_rerank, graph_rerank=config.graph_rerank,
         )
         files = retrieved_files(results)
         row = {
