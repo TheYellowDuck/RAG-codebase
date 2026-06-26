@@ -131,7 +131,9 @@ The value isn't "it works" — it's *measuring what moves the needle and reporti
    separation," not a fake winner) — but **BM25 becomes decisive at scale** (Django +0.10).
 4. **Three features measured useless/harmful, then turned off** — HyDE, self-repair (its gain
    was regression-to-the-mean, proven with a control), and a general-domain cross-encoder
-   reranker (hurt code retrieval `0.86 → 0.63`).
+   reranker (hurt code retrieval `0.86 → 0.63`). Follow-up: that was the *model*, not
+   reranking — a **code-capable** cross-encoder (jina-reranker-v2) *lifts* the same HumanEval
+   task to `0.957` (p<0.001), kept as an opt-in with the default still off (RESULTS §3f).
 5. **A faithfulness number that was a measurement artifact** — 0.79 → ~0.95 once the judge
    could see enough of each cited source; the system was already grounded, the judge was blind.
 6. **The code graph helps only conditionally** — significant on Go (p=0.019), null on Python.
