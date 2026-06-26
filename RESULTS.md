@@ -285,18 +285,24 @@ LLM rerankers) and implemented the worthwhile ones. Two didn't transfer; one did
 |---|---|---|
 | Granite embedder (CoIR-strong) | HumanEval 0.927 < CodeRankEmbed 0.994 | no |
 | Contextual Retrieval (Anthropic, −49% failed retrievals on prose) | FastAPI +0.006 (noise) | no |
-| **Listwise LLM reranker** | **FastAPI +0.086 (p<0.001), Django +0.062** | **yes (opt-in)** |
+| **Listwise LLM reranker** | **ranking ↑ MRR/NDCG (p<0.001); recall +0.086 de-confounded set, setup-dependent** | **yes (opt-in)** |
 
 - **Contextual Retrieval didn't transfer — and the reason is instructive:** our
   `embed_text` already prepends a structural header (file / class / signature /
   docstring), so code chunks are *already* contextualized; the LLM blurb is redundant
   (Anthropic's gain comes from prose chunks that carry no context). A good example of a
   technique whose value depends on what your chunks already contain.
-- **The listwise LLM reranker is the one lever that significantly moved recall.** Show
-  the top-15 fused candidates to the LLM and let it *reason* about which match the
-  query — it disambiguates near-duplicate symbols where cross-encoders (MiniLM, bge)
-  and graph-PPR could not. **FastAPI recall@5 0.744 → 0.830 (+0.086, p<0.001, n=106)**;
-  Django 0.662 → 0.725 (+0.062, n=40, p=0.23 — same direction, underpowered). It works
+- **The listwise LLM reranker is the one lever that significantly sharpens ranking — an
+  ordering/correctness win, with a setup-dependent recall effect.** Show the top-15 fused
+  candidates to the LLM and let it *reason* about which match the query — it disambiguates
+  near-duplicate symbols where cross-encoders (MiniLM, bge) and graph-PPR could not.
+  **FastAPI recall@5 0.744 → 0.830 (+0.086, p<0.001, n=106)** on the de-confounded set;
+  Django 0.662 → 0.725 (+0.062, n=40, p=0.23 — same direction, underpowered). A later paired
+  replication on the *default* embedder (higher 0.850 baseline → less recall headroom)
+  reproduced a large **ranking** lift (MRR 0.80 → 0.91–0.94, NDCG +0.10, both p<0.001, CIs
+  disjoint, and ≥ baseline out-of-domain on cobra/Go) but left recall@5 within noise (+0.02,
+  p≈0.08) — consistent with §"recall is candidate-bound, not ordering-bound" above. So the
+  robust, generalizing effect is on **ordering**, not recall. It works
   on *both* small and at-scale repos. The cost is one LLM call per query, so it ships
   **opt-in** (`llm_rerank=True` / `--llm-rerank`), a "premium" mode — but unlike
   everything else this session, its recall gain is real and significant.
