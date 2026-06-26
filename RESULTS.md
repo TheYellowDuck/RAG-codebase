@@ -631,12 +631,10 @@ Django 30 in-scope), file-level recall@5 / MRR with the repo's `bootstrap_ci` +
    19% class / 6% module / 4% function; **zero window chunks**), so window-overlap has no
    surface to act on. Untested, not null — needs a window-chunking corpus.
 
-5. **A code-tuned cross-encoder (jina / Qwen3): blocked by environment, not a result** —
-   Python 3.14 + transformers 5.x removed an API jina's remote code imports, and an isolated
-   `transformers==4.40` env can't build `tokenizers` (no cp314 wheel). Needs a Python
-   3.10/3.11 env. The genuinely-untested cell is narrow: a code-tuned **cross-encoder** — the
-   code-embedder axis (CodeRankEmbed) and the code-aware-reranking axis (the LLM reranker)
-   are already covered.
+5. **A code-capable cross-encoder (jina-reranker-v2): the first reranker that *helps* code
+   retrieval — see §3f below.** (It can't load in the main Python 3.14 env — transformers 5.x
+   drops APIs its remote code needs — so it was run in an isolated Python 3.11 env;
+   reproducible via `scripts/exp_code_reranker.py`.)
 
 **Methodology note (worth a re-measure).** The production candidate pool
 (`dense_top_n`/`bm25_top_n` = 40, `fuse_top_n` = 30) **caps recall**: a widened-pool
@@ -647,3 +645,42 @@ only — the 150-question scaffolded Django set (recall@5 0.423) still shows a g
 at-scale candidate-bound residual (§ above). A concrete untested lever this surfaces:
 **widening the pool that feeds the reranker** could let it pull gold from ranks 30–100 into
 the top-5 on the ordering-bound sets.
+
+### §3f. A *code-capable* cross-encoder reranker beats the hybrid baseline — including where the general one failed
+
+The general-domain cross-encoders the project shipped/tested all **hurt** code retrieval
+(`ms-marco-MiniLM` §3d: HumanEval recall@10 0.86→0.63; `bge-m3` §3b below baseline) — which
+is why `use_rerank` defaults False. The open question was whether the problem was *reranking*
+or the *general-domain model*. Testing the open cell — `jinaai/jina-reranker-v2-base-multilingual`
+(code-capable: multilingual, trained on code, CoIR-benchmarked) — answers it: **the model.**
+
+Reranking the project's own fused dense+BM25 pool (top-50, scoring `(query, embed_text)` to
+match `rerank.py:45`), paired bootstrap vs the same pool in fused order:
+
+| corpus | n | recall@k: base → reranked (paired Δ, p) | MRR Δ (p) |
+|---|---|---|---|
+| **HumanEval** (docstring→solution) | 164 | @10 **0.841 → 0.957 (+0.116, p<0.001)**; @5 0.713 → 0.890 (+0.177, p<0.001) | +0.197 (p<0.001) |
+| **FastAPI** golden | 80 | @5 **0.873 → 0.917 (+0.044, p=0.009)** | +0.094 (p=0.003) |
+| **Django** golden | 30 | @5 0.767 → 0.850 (+0.083, p=0.092 — borderline) | +0.123 (p=0.019) |
+| **cobra** (Go) golden | 30 | @5 0.917 → 0.950 (+0.033, p=0.55 — at ceiling) | +0.011 (ns) |
+
+**The decisive result is HumanEval.** It is the *exact* task that cratered the general
+cross-encoder (recall@10 0.86→0.63); the code-capable reranker instead **lifts it to 0.957**
+(+0.116, n=164, p<0.001) — and that test is confound-free (raw solution code, no `File:`
+header, so no path-leak; pure reranking within a fixed pool, not pool-width). This confirms
+§3d's own thesis: the failure was *domain mismatch, not reranking*.
+
+**Disposition — the default stays OFF; this is an opt-in upgrade, not a reversal.** The
+`use_rerank=False` decision was scoped to the general cross-encoder and explicitly named the
+re-enable precondition ("once a code-tuned cross-encoder beats the hybrid baseline" —
+`config.py`). This **meets** that precondition; it does not contradict it. It is not flipped on
+by default because it **cannot load in the project's own Python 3.14 interpreter** — a default
+that doesn't run in the shipped env is a non-starter. Treat it like `graph_rerank` / the LLM
+reranker: a measured, opt-in lever (`CODERAG_RERANK_MODEL`, env-gated).
+
+Honest caveats: it is code-**capable**, not code-tuned (a dedicated code CE, Qwen3-class,
+stays untested); the small-set recall gains (Django borderline, cobra at ceiling) lean on the
+two large sets (HumanEval n=164, FastAPI n=80); part of the FastAPI recall lift is pool-width
+(pool-30 pure rerank is +0.033, p=0.050); and per-query latency on MPS is unmeasured (the
+"free vs the LLM reranker's API cost" claim is dollars, not milliseconds). Reproduce with
+`scripts/exp_code_reranker.py` (dump pools in the main env, rerank in a Python 3.11 env).
