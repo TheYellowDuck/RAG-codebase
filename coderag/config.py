@@ -65,7 +65,12 @@ class Settings:
     rrf_k: int = 60                  # RRF constant (§3.3)
     use_dense: bool = True
     use_bm25: bool = True
-    use_rerank: bool = True
+    # Opt-in: the general-domain cross-encoder is measured net-neutral-to-negative
+    # on code retrieval (RESULTS §3d: HumanEval recall@10 0.86→0.63; §3b bge-m3 and
+    # MiniLM both below the hybrid baseline). The validated accuracy lever is the
+    # listwise LLM reranker (--accurate). Re-enable per call, or once a code-tuned
+    # cross-encoder is benchmarked to beat the hybrid baseline.
+    use_rerank: bool = False
     expand_graph: bool = False        # pull code-graph neighbors into context
     graph_expand_budget: int = 4      # legacy: max neighbors appended post-rerank
     # Graph fix: feed neighbors into the rerank POOL (so they must earn relevance)

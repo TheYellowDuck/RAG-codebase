@@ -101,7 +101,7 @@ def _cmd_query(args) -> int:
     results = retriever.retrieve(
         args.question, k=args.k,
         use_dense=not args.no_dense, use_bm25=not args.no_bm25,
-        use_rerank=not args.no_rerank, expand_graph=args.expand_graph,
+        use_rerank=args.rerank, expand_graph=args.expand_graph,
         use_hyde=args.hyde, graph_rerank=args.graph_rerank,
         llm_rerank=args.llm_rerank or args.accurate,
     )
@@ -178,7 +178,7 @@ _CHAT_HELP = """commands:
 def _chat_answer(question, retriever, settings, index, client, args,
                  show_sources, retrieve_only) -> None:
     results = retriever.retrieve(
-        question, k=args.k, use_rerank=not args.no_rerank,
+        question, k=args.k, use_rerank=args.rerank,
         expand_graph=args.expand_graph)
     if show_sources or retrieve_only or client is None:
         for r in results:
@@ -511,7 +511,11 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--no-dense", action="store_true")
     pq.add_argument("--dense-only", dest="no_bm25", action="store_true")
     pq.add_argument("--no-bm25", dest="no_bm25", action="store_true")
-    pq.add_argument("--no-rerank", action="store_true")
+    pq.add_argument("--rerank", dest="rerank", action="store_true", default=None,
+                    help="enable the cross-encoder reranker (opt-in: measured net-neutral/"
+                         "negative on code retrieval, so OFF by default — see RESULTS.md §3d)")
+    pq.add_argument("--no-rerank", dest="rerank", action="store_false",
+                    help="force the cross-encoder reranker off (already the default)")
     pq.add_argument("--hyde", action="store_true",
                     help="HyDE: draft a hypothetical snippet with the LLM and embed "
                          "it for dense search (needs a provider/key)")
@@ -533,7 +537,9 @@ def build_parser() -> argparse.ArgumentParser:
     pchat = sub.add_parser("chat", help="Interactive REPL over the index (ask many).")
     pchat.add_argument("--index", default=Settings().index_dir)
     pchat.add_argument("-k", type=int, default=None, help="final chunks to retrieve")
-    pchat.add_argument("--no-rerank", action="store_true")
+    pchat.add_argument("--rerank", dest="rerank", action="store_true", default=None,
+                       help="enable the cross-encoder reranker (off by default — see RESULTS.md §3d)")
+    pchat.add_argument("--no-rerank", dest="rerank", action="store_false")
     pchat.add_argument("--expand-graph", action="store_true")
     pchat.add_argument("--model", default=None,
                        help="generation model for this run (overrides CODERAG_GEN_MODEL)")

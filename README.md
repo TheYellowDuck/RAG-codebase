@@ -10,9 +10,9 @@
 A **code-aware retrieval-augmented generation (RAG)** system for asking natural-language
 questions about a codebase and getting grounded, **citation-backed** answers. It chunks
 source on **AST boundaries** with **tree-sitter** (not character windows), retrieves with
-**hybrid dense + BM25 search** fused by **Reciprocal Rank Fusion** and **cross-encoder
-reranking**, builds a **code graph** (imports / calls / containment) with **personalized
-PageRank** for connected context, answers with **Claude** using `[n]` citations plus an
+**hybrid dense + BM25 search** fused by **Reciprocal Rank Fusion** (with an optional
+**cross-encoder** and the measured-best **listwise LLM reranker**), builds a **code graph**
+(imports / calls / containment) with **personalized PageRank** for connected context, answers with **Claude** using `[n]` citations plus an
 **LLM-as-judge faithfulness** check, and — the centerpiece — ships a rigorous **evaluation
 harness** (recall@k / MRR / NDCG, **bootstrap confidence intervals**, **paired significance
 tests**). Provider-agnostic (Anthropic or any **OpenAI-compatible** endpoint, incl. local
@@ -29,7 +29,8 @@ measured write-up is [RESULTS.md](RESULTS.md).
   language specs (Python, JS, TS, Go, Rust, Ruby, Java, C/C++, C#, PHP, Kotlin, Scala, Swift,
   Lua, Bash, Perl, Objective-C) + a generic pattern classifier, with line-window fallback.
 - **Hybrid retrieval** — dense semantic search (sentence-transformers) + lexical BM25, fused
-  by Reciprocal Rank Fusion, reranked by a cross-encoder.
+  by Reciprocal Rank Fusion; an optional cross-encoder and a validated listwise LLM reranker
+  refine the pool (the cross-encoder is off by default — measured net-negative on code, §3d).
 - **Code graph** — imports / calls / class-method containment with import-aware name
   resolution; personalized-PageRank traversal for connected, token-cheap context.
 - **Grounded generation** — `[n]`-cited answers, an enforced **abstain** path ("the sources
@@ -72,7 +73,9 @@ Design decisions, each empirically motivated:
 - **Hybrid retrieval + RRF.** Developers query exact identifiers (`HTTPException`) that
   embeddings smear together; BM25 nails them, aided by a code-aware tokenizer that splits
   `get_current_user` / `getCurrentUser`. Dense and lexical lists are fused by **Reciprocal
-  Rank Fusion** (rank-based, so no score calibration) and reranked by a cross-encoder.
+  Rank Fusion** (rank-based, so no score calibration). A cross-encoder reranker is wired in
+  but **off by default** (measured net-negative on code retrieval — §3d); the listwise LLM
+  reranker (`--accurate`) is the validated accuracy lever.
 - **Code graph as a token-saver.** Retrieval finds the entry-point chunk; the graph names the
   connected chunks (callees, callers, imports, enclosing class) via a dictionary lookup, so
   the model gets a few precise neighbors plus a compact structural map instead of whole files.
@@ -289,7 +292,7 @@ grounded, cited answer + faithfulness score. (`vhs scripts/demo.tape` renders an
 ```bash
 python -m coderag.cli query "..." --retrieve-only   # no LLM call
 python -m coderag.cli query "..." --dense-only      # disable BM25
-python -m coderag.cli query "..." --no-rerank       # skip cross-encoder
+python -m coderag.cli query "..." --rerank          # enable cross-encoder (OFF by default — net-negative on code, §3d)
 python -m coderag.cli query "..." --expand-graph    # graph neighbors → rerank pool
 python -m coderag.cli query "..." --graph-rerank    # PageRank-connectivity reranking (helps at scale)
 python -m coderag.cli query "..." --llm-rerank      # listwise LLM reranking (+recall, 1 LLM call/query)

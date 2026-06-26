@@ -31,9 +31,7 @@ def route(query: str) -> dict:
     OFF accuracy levers, only scales effort up for harder questions."""
     kind = classify_query(query)
     if kind == "multihop":
-        # widen the net + give the reranker more to work with
-        return {"use_dense": True, "use_bm25": True, "use_rerank": True, "k": 8}
+        return {"use_dense": True, "use_bm25": True, "k": 8}   # widen the net
     if kind == "where":
-        # exact-identifier lookups: lexical matters most, rerank still cheap-win
-        return {"use_dense": True, "use_bm25": True, "use_rerank": True, "k": 4}
-    return {"use_dense": True, "use_bm25": True, "use_rerank": True}
+        return {"use_dense": True, "use_bm25": True, "k": 4}   # lexical matters most
+    return {"use_dense": True, "use_bm25": True}
