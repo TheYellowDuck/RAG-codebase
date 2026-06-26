@@ -1,6 +1,6 @@
 # Code RAG
 
-![tests](https://img.shields.io/badge/tests-158%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-164%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/coverage-66%25-yellowgreen)
 ![lint](https://img.shields.io/badge/lint-ruff-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -115,7 +115,7 @@ graph LR
 | **Official CoIR leaderboard (full 10 tasks)** | CodeRankEmbed mean nDCG@10 **0.619** — beats the paper's best Voyage-Code-002 (0.563) & E5-Mistral-7B (0.552); default 0.377 |
 | Scale — Django (521k LOC, ~40k chunks) | indexes in 84 s; BM25 adds **+0.10** recall@5 (significant) |
 | Faithfulness (accurately judged) | **~0.95** |
-| Test suite | **158 passing** |
+| Test suite | **164 passing** |
 
 ### The honest findings (the point of the project)
 
@@ -171,7 +171,7 @@ scale) > fusion > prompt > graph (conditional) > judge.**
 - **HTTP server** — stdlib ThreadingHTTPServer for the live graph editor (no web deps)
 - **CLI design** — argparse multi-command interface (index / query / chat / eval / bench / graph-*)
 - **MCP (Model Context Protocol) server** — search + grounded-answer tools for coding agents
-- **Testing** — pytest suite (158 tests), torch-free stub embedder, no API key required
+- **Testing** — pytest suite (164 tests), torch-free stub embedder, no API key required
 - **CI / DevOps** — GitHub Actions workflow
 - **Security & secret hygiene** — gitignored dotenv variants, provider-agnostic secret scanner, pre-commit hook
 
@@ -376,7 +376,7 @@ coderag/
 
 ```bash
 pip install -e '.[dev,langs]'      # pytest + ruff + pytest-cov + grammars
-pytest                             # 158 tests; torch-free stub embedder, no API key
+pytest                             # 164 tests; torch-free stub embedder, no API key
 pytest --cov=coderag               # ~66% coverage (core logic 84–95%; LLM/IO paths need a key)
 ruff check coderag tests scripts   # real-bug gate (pyflakes + bugbear); also runs in CI
 ```
@@ -400,7 +400,7 @@ Python 3.11/3.12. The ruff gate is scoped to real-bug rules (`F`, `B`) — inclu
 ### Productionization roadmap
 
 A **rigorously tested reference implementation**, not a deployed service — production-grade on
-*correctness* (158 tests + CI, eval with CIs, secret hygiene) but the *serving/ops* layer is
+*correctness* (164 tests + CI, eval with CIs, secret hygiene) but the *serving/ops* layer is
 deliberately out of scope. The honest gap list: (1) **resilience** ✅ done — configurable
 timeouts/retries + `with_retry` backoff; (2) **observability** — stdlib logger wired, needs
 structured logs/metrics/tracing; (3) **a real API surface** — CLI/MCP today, needs an ASGI
