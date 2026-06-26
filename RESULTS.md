@@ -115,7 +115,8 @@ Honest takeaway: tune the embedder first, but it isn't a silver bullet.
 
    **But — measured honestly — it does not close the two production gaps.** Filling
    the blank cells: at-scale Django recall@5 is **tied** (dense 0.700 vs 0.67, hybrid
-   0.750 vs 0.767 — within wide CIs, n=40), and answer-correctness **did not improve**
+   0.750 vs 0.767 — within wide CIs, n=30; paired bootstrap p=0.885, a definitive null),
+   and answer-correctness **did not improve**
    (0.65 vs 0.78 on n=20, confounded by generation noise). It's also **~7× slower to
    index at scale** (~10 min vs 84 s on Django). So the upgrade is real *where
    retrieval was already decent* (focused repos, docstring tasks), but the at-scale
@@ -598,3 +599,51 @@ Per-run artifacts (table + per-question rows) are written to `eval_runs/<timesta
    faithfulness/correctness numbers.
 3. Try `jinaai/jina-embeddings-v2-base-code` (longer context, code-native) for a
    further dense lift.
+
+---
+
+## Follow-up: re-testing the "untested" levers (a later audit's suggestions)
+
+Five levers a later audit flagged as untested. Result: three nulls/blocks and one
+ordering win — no new default. Small hand-curated sets (FastAPI 80 in-scope,
+Django 30 in-scope), file-level recall@5 / MRR with the repo's `bootstrap_ci` +
+`paired_bootstrap`. **"Blocked by env" is kept strictly separate from "measured null."**
+
+1. **Listwise LLM reranker is an *ordering* lever on Django too** (n=30, paired vs
+   hybrid): MRR **+0.115 (p=0.002)**, NDCG **+0.113 (p<0.001)**, SymMRR +0.170 — all
+   significant; **recall@5 +0.050 is NOT significant (paired p=0.103)**. This replicates
+   the FastAPI "ordering, not recall" finding on a second repo/language (and it stays ≥
+   baseline out-of-domain on cobra/Go). The reranker sharpens ranking; it does not lift
+   recall.
+
+2. **CodeRankEmbed on Django is a measured tie** — paired hybrid CR−default −0.017
+   (p=0.885, definitive null); the dense delta (+0.033) flips sign vs hybrid, i.e. noise.
+   Not a failure, just no transfer of the embedder lever to Django recall@5. (Any
+   seq-length-truncation explanation is withdrawn: the default model caps at 128 tokens,
+   CodeRankEmbed at 512 — CR sees *more* context, not less.)
+
+3. **Query-adaptive fusion and LLM query-decomposition: null** (FastAPI). A rare-identifier-
+   gated BM25 reweight does not beat equal-weight RRF (recall 0.873→0.846, p=0.08); LLM
+   decomposition is null and run-to-run noisy (haiku non-determinism). Equal-weight RRF and
+   single-query retrieval stand. (Harness for these: `scripts/exp_levers.py`.)
+
+4. **Chunk-overlap (E5): N/A on Django** — the index is 100% AST-chunked (68% method /
+   19% class / 6% module / 4% function; **zero window chunks**), so window-overlap has no
+   surface to act on. Untested, not null — needs a window-chunking corpus.
+
+5. **A code-tuned cross-encoder (jina / Qwen3): blocked by environment, not a result** —
+   Python 3.14 + transformers 5.x removed an API jina's remote code imports, and an isolated
+   `transformers==4.40` env can't build `tokenizers` (no cp314 wheel). Needs a Python
+   3.10/3.11 env. The genuinely-untested cell is narrow: a code-tuned **cross-encoder** — the
+   code-embedder axis (CodeRankEmbed) and the code-aware-reranking axis (the LLM reranker)
+   are already covered.
+
+**Methodology note (worth a re-measure).** The production candidate pool
+(`dense_top_n`/`bm25_top_n` = 40, `fuse_top_n` = 30) **caps recall**: a widened-pool
+recompute on these golden sets reaches recall 1.000 by k≈20 (FastAPI) / k≈100 (Django),
+so **both sets are ordering-bound by k~20–40, and the "candidate-bound / flat-to-@40"
+reading reflects the pool cap, not the corpus.** This holds on the small hand-curated sets
+only — the 150-question scaffolded Django set (recall@5 0.423) still shows a genuine
+at-scale candidate-bound residual (§ above). A concrete untested lever this surfaces:
+**widening the pool that feeds the reranker** could let it pull gold from ranks 30–100 into
+the top-5 on the ordering-bound sets.
