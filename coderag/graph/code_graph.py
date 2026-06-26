@@ -201,13 +201,19 @@ class CodeGraph:
         Sparse + bounded: we propagate only over nonzero nodes and keep the top
         `max_frontier` each iteration. PPR mass concentrates near the seeds, so this
         preserves the high-scoring (rankable) nodes while staying fast on a 40k-node
-        graph — without it, repeated per-query PPR is seconds/query."""
+        graph — without it, repeated per-query PPR is seconds/query.
+
+        Scores are an *unnormalized relative connectivity* signal, not a probability
+        distribution: mass on neighbour-less (dangling) nodes is dropped rather than
+        redistributed. That only scales scores, and every consumer uses their rank
+        order, so it doesn't affect results — it just keeps the iteration cheap."""
         if not self.nodes:
             return {}
         adj = self._adjacency()
         seeds = [s for s in seeds if s in self.nodes]
         if not seeds:
             return {}
+        seed_set = set(seeds)
         tele = 1.0 / len(seeds)
         score: dict[str, float] = {s: tele for s in seeds}
         for _ in range(iters):
@@ -221,8 +227,17 @@ class CodeGraph:
             for s in seeds:
                 new[s] += (1 - alpha) * tele
             if len(new) > max_frontier:   # keep the high-mass frontier; the tail can't rank
-                new = dict(sorted(new.items(), key=lambda kv: kv[1], reverse=True)[:max_frontier])
+                kept = dict(sorted(new.items(), key=lambda kv: kv[1], reverse=True)[:max_frontier])
+                for s in seed_set:        # a seed must never be evicted from the frontier
+                    if s in new:
+                        kept[s] = new[s]
+                new = kept
+            # PPR mass concentrates fast; stop once an iteration barely moves so we
+            # don't burn the full `iters` on an already-converged ranking.
+            delta = sum(abs(new.get(k, 0.0) - score.get(k, 0.0)) for k in set(new) | set(score))
             score = new
+            if delta < 1e-9:
+                break
         return dict(score)
 
     def _add_edge(self, src: str, dst: str, edge_type: str) -> None:

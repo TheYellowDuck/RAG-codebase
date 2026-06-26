@@ -15,8 +15,6 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-import numpy as np
-
 from ..config import Settings
 
 _QUERY_FIELDS = ("query", "docstring", "func_documentation_string", "doc")
@@ -68,8 +66,10 @@ def evaluate_codesearchnet(path: str, embedder=None, k: int = 10,
     hits = 0
     mrr = 0.0
     for i in range(n):
-        order = np.argsort(-sims[i])
-        rank = int(np.where(order == i)[0][0]) + 1   # gold for query i is code i
+        # rank = 1 + (# docs strictly outscoring the gold). Deterministic under
+        # score ties (np.argsort's tie order is undefined, so the gold's position
+        # in it could drift); identical to argsort when there are no ties.
+        rank = int((sims[i] > sims[i, i]).sum()) + 1   # gold for query i is code i
         if rank <= k:
             hits += 1
         mrr += 1.0 / rank
