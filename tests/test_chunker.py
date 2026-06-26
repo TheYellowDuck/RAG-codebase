@@ -167,6 +167,23 @@ def test_ruby_generic_chunking_if_pack_available(make_fileinfo):
     assert any(n and n.endswith("run") for n in names)
 
 
+def test_pack_languages_loadable_when_required():
+    """Loud guard for CI: the Go/Ruby tests above SKIP when no grammar resolves, so
+    a silently-incompatible tree-sitter-language-pack (e.g. the >=1.9 native rewrite)
+    would quietly lose AST coverage without failing CI. When CODERAG_REQUIRE_LANGS=1
+    (set in the workflow, which installs the pack), assert the pack-only grammars
+    actually load — turning that silent degradation into a hard failure."""
+    import os
+
+    from coderag.ingest.languages import get_parser
+    if not os.environ.get("CODERAG_REQUIRE_LANGS"):
+        pytest.skip("set CODERAG_REQUIRE_LANGS=1 (CI) to enforce pack-language loading")
+    for lang in ("go", "ruby", "rust", "java"):
+        assert get_parser(lang) is not None, (
+            f"{lang} grammar did not load — is tree-sitter-language-pack >=1.9 "
+            f"(incompatible native rewrite) installed? Pin <1.9.")
+
+
 def test_javascript_ast_chunking_if_grammar_available(make_fileinfo):
     # Skip only if NO JavaScript grammar is available from any source (the
     # dedicated tree-sitter-javascript package OR the language pack) — consistent
