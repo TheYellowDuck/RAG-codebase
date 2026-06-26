@@ -42,8 +42,9 @@ measured write-up is [RESULTS.md](RESULTS.md).
   confidence intervals, paired-bootstrap significance, a holdout split, and ablations.
 - **External benchmarks** — CodeSearchNet (embedder) and HumanEval / CodeRAG-Bench-style
   (full retriever), so quality is validated off the self-made golden set.
-- **Listwise LLM reranker** — the LLM reasons over the candidate pool; the one lever with a
-  *significant* recall gain (+0.086, p<0.001) that also lifts answer-correctness.
+- **Listwise LLM reranker** — the LLM reasons over the candidate pool; the validated accuracy
+  lever — it significantly sharpens *ranking* (MRR/NDCG, p<0.001) and lifts answer-correctness,
+  with a setup-dependent recall gain.
 - **Optional HNSW (ANN) vector backend** (hnswlib) — 16× faster queries at scale; exact
   brute-force matmul is the default.
 - **Interactive graph visualizer/editor** — standalone vis-network HTML (search, force /
@@ -135,12 +136,13 @@ The value isn't "it works" — it's *measuring what moves the needle and reporti
    could see enough of each cited source; the system was already grounded, the judge was blind.
 6. **The code graph helps only conditionally** — significant on Go (p=0.019), null on Python.
 7. **Researched the SOTA for the remaining gaps** — Granite embedder and Anthropic Contextual
-   Retrieval were measured no-ops here, but a **listwise LLM reranker** significantly lifts
-   recall (+0.086, p<0.001) *and* answer-correctness (0.73 → 0.90). It **compounds and
-   dominates the embedder choice**: best measured config is `CodeRankEmbed + LLM rerank` =
-   **recall@5 0.858** (+0.156 over the embedder alone, p<0.001), and any decent embedder +
-   the reranker lands in the same range — so the LLM reranker is *the* accuracy lever
-   (enable with `--accurate`).
+   Retrieval were measured no-ops here, but a **listwise LLM reranker** is the one lever that
+   significantly sharpens **ranking** (MRR/NDCG, p<0.001, CIs disjoint) and answer-correctness
+   (0.73 → 0.90). Its effect on **recall** is setup-dependent: +0.086 on the de-confounded set,
+   but a fresh paired replication on the default embedder lifts ranking sharply while leaving
+   recall@5 within noise (+0.02, p≈0.08) — so it's an **ordering/correctness** lever, not a
+   reliable recall lever. It still **compounds with the embedder choice** (`CodeRankEmbed + LLM
+   rerank` is the best measured config) — *the* accuracy lever, enabled with `--accurate`.
 
 Lever hierarchy that emerged: **LLM rerank (the lever) > chunking > embedder > BM25 (at
 scale) > fusion > prompt > graph (conditional) > judge.**
