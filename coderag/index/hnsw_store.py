@@ -97,7 +97,14 @@ class HNSWVectorStore:
         q = np.asarray(query_vec, dtype=np.float32).reshape(1, -1)
         n = min(top_n, len(self.ids))
         self._index.set_ef(max(self.ef_search, n))   # ef must be >= k
-        labels, distances = self._index.knn_query(q, k=n)
+        try:
+            labels, distances = self._index.knn_query(q, k=n)
+        except RuntimeError:
+            # hnswlib can raise "Cannot return the results in a contiguous 2D
+            # array" once enough elements are mark_deleted (remove() never
+            # rebuilds). Fail open like the rest of the pipeline rather than
+            # crash the dense retrieval leg.
+            return []
         out = []
         for lbl, dist in zip(labels[0], distances[0], strict=True):
             cid = self._label_to_id.get(int(lbl))

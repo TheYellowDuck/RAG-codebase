@@ -184,7 +184,11 @@ def _signature_line(node, source: bytes, spec: LanguageSpec) -> str:
     if body is not None:
         sig = source[node.start_byte:body.start_byte].decode("utf-8", "replace")
     else:
-        sig = _text(node, source).splitlines()[0]
+        # A zero-width / error node can decode to "" → splitlines() == [] → [0]
+        # would IndexError out of chunk_file (whose try only wraps parser.parse),
+        # crashing the whole file's indexing. Fall back to no signature instead.
+        lines = _text(node, source).splitlines()
+        sig = lines[0] if lines else ""
     return " ".join(sig.split())
 
 

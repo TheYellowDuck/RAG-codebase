@@ -19,7 +19,11 @@ import sys
 
 from .languages import get_parser, reset_parser_cache
 
-_PACK = "tree-sitter-language-pack"
+# Mirror the pyproject/[langs] cap exactly: the pack's 1.9 native rewrite returns
+# a non-tree_sitter.Language from get_language() and breaks AST chunking. The bare
+# name here would install the latest (1.9+) at runtime and silently re-introduce
+# that regression, bypassing the declared cap.
+_PACK = "tree-sitter-language-pack>=0.7.0,<1.9"
 
 
 def missing_grammars(languages) -> set[str]:
