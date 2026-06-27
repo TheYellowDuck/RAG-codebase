@@ -30,7 +30,7 @@ RERANKER = "jinaai/jina-reranker-v2-base-multilingual"
 
 
 def _paired(a, b, n=2000, seed=0):
-    d = [x - y for x, y in zip(a, b)]
+    d = [x - y for x, y in zip(a, b, strict=True)]
     rng = random.Random(seed)
     N = len(d)
     res = sorted(sum(d[rng.randrange(N)] for _ in range(N)) / N for _ in range(n))
@@ -96,7 +96,7 @@ def cmd_dump_humaneval(bench_path):
     dv = np.asarray(emb.encode(docs), dtype=np.float32)
     qv = np.asarray(emb.encode(queries, is_query=True), dtype=np.float32)
     bm = BM25Okapi([code_tokens(d) for d in docs])
-    id2 = dict(zip(ids, docs))
+    id2 = dict(zip(ids, docs, strict=True))
     out = []
     for i, q in enumerate(queries):
         dorder = [ids[j] for j in np.argsort(-(dv @ qv[i]))[:POOL]]
@@ -126,7 +126,7 @@ def cmd_rerank(tag):
         base_keys = _dedup([c["key"] for c in r["cands"]])
         sc = m.compute_score([[r["q"], c["text"]] for c in r["cands"]], max_length=512)
         rer_keys = _dedup([c["key"] for c, _ in
-                           sorted(zip(r["cands"], sc), key=lambda x: float(x[1]), reverse=True)])
+                           sorted(zip(r["cands"], sc, strict=True), key=lambda x: float(x[1]), reverse=True)])
         for k in ks:
             base[k].append(_hit(base_keys, gold, k))
             rer[k].append(_hit(rer_keys, gold, k))
