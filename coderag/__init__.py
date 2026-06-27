@@ -6,4 +6,4 @@ and a code graph, then answers questions with Claude using verifiable [n] citati
 See outline.md for the full technical design; each module maps to a numbered section.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
